@@ -28,6 +28,7 @@ function getTrustedOrigins(): string[] {
     'https://www.openfacilitator.io',
     'https://dashboard.openfacilitator.io',
     'https://openfacilitator-dashboard.vercel.app',
+    'https://api.openfacilitator.io',
   ];
 
   if (dashboardUrl && !origins.includes(dashboardUrl)) {
