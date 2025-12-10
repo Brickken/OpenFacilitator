@@ -1,4 +1,4 @@
-import { createPublicClient, http, type Address, type Hex } from 'viem';
+import { createPublicClient, http, type Hex } from 'viem';
 import { base, baseSepolia, mainnet, sepolia } from 'viem/chains';
 import type {
   FacilitatorConfig,
@@ -8,11 +8,12 @@ import type {
   SupportedResponse,
   VerifyResponse,
   X402PaymentPayload,
+  ChainId,
 } from './types.js';
 import { getChainIdFromNetwork, getNetworkFromChainId, defaultChains } from './chains.js';
 
 /**
- * Chain ID to viem chain mapping
+ * Chain ID to viem chain mapping (EVM chains only)
  */
 const viemChains = {
   8453: base,
@@ -23,6 +24,13 @@ const viemChains = {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyPublicClient = ReturnType<typeof createPublicClient<any, any>>;
+
+/**
+ * Check if a chain ID is an EVM chain
+ */
+function isEVMChain(chainId: ChainId): chainId is number {
+  return typeof chainId === 'number';
+}
 
 /**
  * Facilitator class for handling x402 payment verification and settlement
@@ -37,12 +45,15 @@ export class Facilitator {
   }
 
   /**
-   * Initialize viem clients for supported chains
+   * Initialize viem clients for supported EVM chains
    */
   private initializeClients(): void {
     for (const chainId of this.config.supportedChains) {
+      // Only initialize clients for EVM chains
+      if (!isEVMChain(chainId)) continue;
+
       const chain = viemChains[chainId as keyof typeof viemChains];
-      const chainConfig = defaultChains[chainId];
+      const chainConfig = defaultChains[String(chainId)];
 
       if (chain && chainConfig) {
         const client = createPublicClient({
@@ -106,24 +117,29 @@ export class Facilitator {
       }
 
       // Check if chain is supported by this facilitator
-      if (!this.config.supportedChains.includes(chainId)) {
+      const isSupported = this.config.supportedChains.some(
+        (c) => String(c) === String(chainId)
+      );
+      if (!isSupported) {
         return {
           valid: false,
           invalidReason: `Chain ${chainId} not supported by this facilitator`,
         };
       }
 
-      // Get the client for this chain
-      const client = this.clients.get(chainId);
-      if (!client) {
-        return {
-          valid: false,
-          invalidReason: `No client configured for chain ${chainId}`,
-        };
+      // For EVM chains, get the client
+      if (isEVMChain(chainId)) {
+        const client = this.clients.get(chainId);
+        if (!client) {
+          return {
+            valid: false,
+            invalidReason: `No client configured for chain ${chainId}`,
+          };
+        }
       }
 
       // Validate the authorization
-      const { authorization, signature } = payload;
+      const { authorization } = payload;
 
       // Check timestamp validity
       const now = Math.floor(Date.now() / 1000);
@@ -150,8 +166,9 @@ export class Facilitator {
         };
       }
 
-      // TODO: Verify signature on-chain using ERC-3009 receiveWithAuthorization
-      // For MVP, we do basic validation only
+      // TODO: Verify signature on-chain
+      // For EVM: use ERC-3009 receiveWithAuthorization
+      // For Solana: use SPL Token transfer verification
 
       return {
         valid: true,
@@ -186,7 +203,7 @@ export class Facilitator {
 
       // Parse payload
       const decoded = Buffer.from(paymentPayload, 'base64').toString('utf-8');
-      const payload: X402PaymentPayload = JSON.parse(decoded);
+      const _payload: X402PaymentPayload = JSON.parse(decoded);
 
       const chainId = getChainIdFromNetwork(requirements.network);
       if (!chainId) {
@@ -197,9 +214,9 @@ export class Facilitator {
         };
       }
 
-      // TODO: Execute the ERC-3009 receiveWithAuthorization transaction
-      // This requires the facilitator's private key to submit the transaction
-      // For MVP, we return a mock success
+      // TODO: Execute the transfer
+      // For EVM: ERC-3009 receiveWithAuthorization transaction
+      // For Solana: SPL Token transfer
 
       if (!privateKey) {
         return {
@@ -210,7 +227,7 @@ export class Facilitator {
       }
 
       // Mock transaction hash for MVP
-      const mockTxHash: Hex = `0x${'0'.repeat(64)}` as Hex;
+      const mockTxHash = `0x${'0'.repeat(64)}`;
 
       return {
         success: true,
@@ -233,4 +250,3 @@ export class Facilitator {
 export function createFacilitator(config: FacilitatorConfig): Facilitator {
   return new Facilitator(config);
 }
-
