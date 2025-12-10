@@ -59,7 +59,7 @@ export default function FacilitatorDetailPage() {
     queryKey: ['domainStatus', id],
     queryFn: () => api.getDomainStatus(id),
     enabled: !!facilitator?.customDomain,
-    refetchInterval: (data) => (data?.status === 'pending' ? 10000 : false), // Poll every 10s if pending
+    refetchInterval: (query) => (query.state.data?.status === 'pending' ? 10000 : false), // Poll every 10s if pending
   });
 
   const setupDomainMutation = useMutation({

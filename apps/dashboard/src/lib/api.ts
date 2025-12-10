@@ -145,7 +145,6 @@ class ApiClient {
       method: 'POST',
     });
   }
-}
 
   // Domain Management
   async setupDomain(facilitatorId: string): Promise<{ success: boolean; domain?: string; status?: string; message?: string; error?: string }> {
