@@ -241,13 +241,19 @@ router.post('/settle', requireFacilitator, async (req: Request, res: Response) =
     const parsedPayload = JSON.parse(decoded);
     
     // Extract from_address based on network type
+    // Handle both flat and nested payload structures
     let fromAddress = 'unknown';
     if (isSolanaNetwork) {
-      // For Solana, payer info is embedded in transaction - use payTo from requirements
+      // For Solana, the payer is the fee payer - use payTo from requirements as fallback
+      // In x402, the payer signs the transaction, we don't have direct access to their address
+      // Use the configured feePayer or payTo as identifier
       fromAddress = paymentRequirements.payTo || 'solana-payer';
     } else {
-      // For EVM, use authorization.from
-      fromAddress = parsedPayload.authorization?.from || 'unknown';
+      // For EVM, use authorization.from - handle both nested and flat formats
+      // Format 1: { authorization: { from: ... } }
+      // Format 2: { payload: { authorization: { from: ... } } }
+      const authorization = parsedPayload.authorization || parsedPayload.payload?.authorization;
+      fromAddress = authorization?.from || 'unknown';
     }
     
     // Log the settlement attempt

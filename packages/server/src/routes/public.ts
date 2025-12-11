@@ -253,11 +253,14 @@ router.post('/free/settle', async (req: Request, res: Response) => {
     const decoded = Buffer.from(paymentPayload, 'base64').toString('utf-8');
     const parsedPayload = JSON.parse(decoded);
     
+    // Extract from_address - handle both flat and nested payload structures
     let fromAddress = 'unknown';
     if (isSolanaNetwork) {
       fromAddress = paymentRequirements.payTo || 'solana-payer';
     } else {
-      fromAddress = parsedPayload.authorization?.from || 'unknown';
+      // For EVM, use authorization.from - handle both nested and flat formats
+      const authorization = parsedPayload.authorization || parsedPayload.payload?.authorization;
+      fromAddress = authorization?.from || 'unknown';
     }
 
     const transaction = createTransaction({
