@@ -8,7 +8,15 @@ import {
   deleteFacilitator,
 } from '../db/facilitators.js';
 import { getTransactionsByFacilitator } from '../db/transactions.js';
-import { defaultTokens, getWalletAddress, getWalletBalance } from '@openfacilitator/core';
+import { 
+  defaultTokens, 
+  getWalletAddress, 
+  getWalletBalance,
+  generateSolanaKeypair,
+  getSolanaPublicKey,
+  getSolanaBalance,
+  isValidSolanaPrivateKey,
+} from '@openfacilitator/core';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import { 
   addCustomDomain, 
@@ -451,7 +459,7 @@ router.get('/facilitators/:id/wallet', requireAuth, async (req: Request, res: Re
 });
 
 /**
- * DELETE /api/admin/facilitators/:id/wallet - Remove wallet
+ * DELETE /api/admin/facilitators/:id/wallet - Remove EVM wallet
  */
 router.delete('/facilitators/:id/wallet', requireAuth, async (req: Request, res: Response) => {
   try {
@@ -462,7 +470,7 @@ router.delete('/facilitators/:id/wallet', requireAuth, async (req: Request, res:
     }
 
     if (!facilitator.encrypted_private_key) {
-      res.status(404).json({ error: 'No wallet configured' });
+      res.status(404).json({ error: 'No EVM wallet configured' });
       return;
     }
 
@@ -477,6 +485,172 @@ router.delete('/facilitators/:id/wallet', requireAuth, async (req: Request, res:
     res.json({ success: true, message: 'Wallet removed' });
   } catch (error) {
     console.error('Delete wallet error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ============= SOLANA WALLET ENDPOINTS =============
+
+/**
+ * POST /api/admin/facilitators/:id/wallet/solana - Generate a new Solana wallet
+ */
+router.post('/facilitators/:id/wallet/solana', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const facilitator = getFacilitatorById(req.params.id);
+    if (!facilitator) {
+      res.status(404).json({ error: 'Facilitator not found' });
+      return;
+    }
+
+    // Check if Solana wallet already exists
+    if (facilitator.encrypted_solana_private_key) {
+      res.status(409).json({ error: 'Solana wallet already exists. Delete it first to generate a new one.' });
+      return;
+    }
+
+    // Generate new Solana wallet
+    const wallet = generateSolanaKeypair();
+    
+    // Encrypt and store
+    const encryptedKey = encryptPrivateKey(wallet.privateKey);
+    const updated = updateFacilitator(req.params.id, { encrypted_solana_private_key: encryptedKey });
+    
+    if (!updated) {
+      res.status(500).json({ error: 'Failed to save Solana wallet' });
+      return;
+    }
+
+    res.status(201).json({
+      success: true,
+      address: wallet.publicKey,
+      message: 'Solana wallet generated. Fund this address with SOL for transaction fees.',
+    });
+  } catch (error) {
+    console.error('Generate Solana wallet error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/admin/facilitators/:id/wallet/solana/import - Import an existing Solana private key
+ */
+router.post('/facilitators/:id/wallet/solana/import', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const facilitator = getFacilitatorById(req.params.id);
+    if (!facilitator) {
+      res.status(404).json({ error: 'Facilitator not found' });
+      return;
+    }
+
+    const { privateKey } = req.body;
+    if (!privateKey || typeof privateKey !== 'string') {
+      res.status(400).json({ error: 'Private key is required' });
+      return;
+    }
+
+    // Validate Solana private key format (base58, 64 bytes when decoded)
+    if (!isValidSolanaPrivateKey(privateKey)) {
+      res.status(400).json({ error: 'Invalid Solana private key format. Must be base58-encoded 64-byte key.' });
+      return;
+    }
+
+    // Get public key from private key
+    const address = getSolanaPublicKey(privateKey);
+    
+    // Encrypt and store
+    const encryptedKey = encryptPrivateKey(privateKey);
+    const updated = updateFacilitator(req.params.id, { encrypted_solana_private_key: encryptedKey });
+    
+    if (!updated) {
+      res.status(500).json({ error: 'Failed to save Solana wallet' });
+      return;
+    }
+
+    res.status(201).json({
+      success: true,
+      address,
+      message: 'Solana wallet imported successfully.',
+    });
+  } catch (error) {
+    console.error('Import Solana wallet error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/admin/facilitators/:id/wallet/solana - Get Solana wallet info
+ */
+router.get('/facilitators/:id/wallet/solana', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const facilitator = getFacilitatorById(req.params.id);
+    if (!facilitator) {
+      res.status(404).json({ error: 'Facilitator not found' });
+      return;
+    }
+
+    if (!facilitator.encrypted_solana_private_key) {
+      res.json({
+        hasWallet: false,
+        address: null,
+        balance: null,
+      });
+      return;
+    }
+
+    // Decrypt private key to get address
+    const privateKey = decryptPrivateKey(facilitator.encrypted_solana_private_key);
+    const address = getSolanaPublicKey(privateKey);
+
+    // Get SOL balance
+    let balance = null;
+    try {
+      const result = await getSolanaBalance('solana', address);
+      balance = {
+        sol: result.formatted,
+        lamports: result.balance.toString(),
+      };
+    } catch (e) {
+      console.error('Failed to get Solana balance:', e);
+    }
+
+    res.json({
+      hasWallet: true,
+      address,
+      balance,
+    });
+  } catch (error) {
+    console.error('Get Solana wallet error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * DELETE /api/admin/facilitators/:id/wallet/solana - Remove Solana wallet
+ */
+router.delete('/facilitators/:id/wallet/solana', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const facilitator = getFacilitatorById(req.params.id);
+    if (!facilitator) {
+      res.status(404).json({ error: 'Facilitator not found' });
+      return;
+    }
+
+    if (!facilitator.encrypted_solana_private_key) {
+      res.status(404).json({ error: 'No Solana wallet configured' });
+      return;
+    }
+
+    // Remove wallet
+    const updated = updateFacilitator(req.params.id, { encrypted_solana_private_key: '' });
+    
+    if (!updated) {
+      res.status(500).json({ error: 'Failed to remove Solana wallet' });
+      return;
+    }
+
+    res.json({ success: true, message: 'Solana wallet removed' });
+  } catch (error) {
+    console.error('Delete Solana wallet error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

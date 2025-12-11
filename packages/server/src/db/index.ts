@@ -43,6 +43,7 @@ export function initializeDatabase(dbPath?: string): Database.Database {
       supported_chains TEXT NOT NULL DEFAULT '[]',
       supported_tokens TEXT NOT NULL DEFAULT '[]',
       encrypted_private_key TEXT,
+      encrypted_solana_private_key TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );

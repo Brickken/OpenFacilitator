@@ -9,7 +9,8 @@ export interface FacilitatorRecord {
   owner_address: string;
   supported_chains: string; // JSON string
   supported_tokens: string; // JSON string
-  encrypted_private_key: string | null;
+  encrypted_private_key: string | null; // EVM (Ethereum/Base) private key
+  encrypted_solana_private_key: string | null; // Solana private key
   created_at: string;
   updated_at: string;
 }

@@ -68,9 +68,9 @@ export function decryptPrivateKey(encryptedData: string): string {
 }
 
 /**
- * Generate a new Ethereum wallet
+ * Generate a new EVM wallet (Ethereum/Base)
  */
-export function generateWallet(): { address: string; privateKey: string } {
+export function generateEVMWallet(): { address: string; privateKey: string } {
   // Generate random 32 bytes for private key
   const privateKeyBytes = crypto.randomBytes(32);
   const privateKey = `0x${privateKeyBytes.toString('hex')}`;
@@ -82,4 +82,7 @@ export function generateWallet(): { address: string; privateKey: string } {
     privateKey,
   };
 }
+
+// Alias for backward compatibility
+export const generateWallet = generateEVMWallet;
 

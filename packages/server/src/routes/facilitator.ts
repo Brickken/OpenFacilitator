@@ -142,28 +142,54 @@ router.post('/settle', requireFacilitator, async (req: Request, res: Response) =
 
     const facilitator = createFacilitator(config);
 
-    // Get and decrypt the private key for this facilitator
-    let privateKey: Hex | undefined;
-    if (record.encrypted_private_key) {
-      try {
-        privateKey = decryptPrivateKey(record.encrypted_private_key) as Hex;
-      } catch (e) {
-        console.error('Failed to decrypt private key:', e);
-        res.status(500).json({
+    // Determine which private key to use based on network
+    const isSolanaNetwork = paymentRequirements.network === 'solana' || paymentRequirements.network === 'solana-devnet';
+    
+    let privateKey: string | undefined;
+    
+    if (isSolanaNetwork) {
+      // Use Solana wallet for Solana networks
+      if (record.encrypted_solana_private_key) {
+        try {
+          privateKey = decryptPrivateKey(record.encrypted_solana_private_key);
+        } catch (e) {
+          console.error('Failed to decrypt Solana private key:', e);
+          res.status(500).json({
+            success: false,
+            errorMessage: 'Failed to decrypt Solana wallet',
+          });
+          return;
+        }
+      } else {
+        res.status(400).json({
           success: false,
-          errorMessage: 'Failed to decrypt facilitator wallet',
+          errorMessage: 'Solana wallet not configured. Please set up a Solana wallet in the dashboard.',
         });
         return;
       }
     } else {
-      res.status(400).json({
-        success: false,
-        errorMessage: 'Facilitator wallet not configured. Please set up a wallet in the dashboard.',
-      });
-      return;
+      // Use EVM wallet for EVM networks (Base, Ethereum, etc.)
+      if (record.encrypted_private_key) {
+        try {
+          privateKey = decryptPrivateKey(record.encrypted_private_key);
+        } catch (e) {
+          console.error('Failed to decrypt EVM private key:', e);
+          res.status(500).json({
+            success: false,
+            errorMessage: 'Failed to decrypt EVM wallet',
+          });
+          return;
+        }
+      } else {
+        res.status(400).json({
+          success: false,
+          errorMessage: 'EVM wallet not configured. Please set up an EVM wallet in the dashboard.',
+        });
+        return;
+      }
     }
 
-    const result = await facilitator.settle(paymentPayload, paymentRequirements, privateKey);
+    const result = await facilitator.settle(paymentPayload, paymentRequirements, privateKey as Hex);
 
     // Parse payload to get from address
     const decoded = Buffer.from(paymentPayload, 'base64').toString('utf-8');

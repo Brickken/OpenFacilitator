@@ -52,9 +52,12 @@ export default function FacilitatorDetailPage() {
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedDns, setCopiedDns] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState(false);
+  const [copiedSolanaAddress, setCopiedSolanaAddress] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isImportWalletOpen, setIsImportWalletOpen] = useState(false);
+  const [isImportSolanaWalletOpen, setIsImportSolanaWalletOpen] = useState(false);
   const [importPrivateKey, setImportPrivateKey] = useState('');
+  const [importSolanaPrivateKey, setImportSolanaPrivateKey] = useState('');
   const queryClient = useQueryClient();
 
   const { data: facilitator, isLoading } = useQuery({
@@ -118,6 +121,39 @@ export default function FacilitatorDetailPage() {
     onSuccess: () => {
       refetchWallet();
       queryClient.invalidateQueries({ queryKey: ['wallet', id] });
+    },
+  });
+
+  // Solana wallet queries and mutations
+  const { data: solanaWalletInfo, refetch: refetchSolanaWallet } = useQuery({
+    queryKey: ['solanaWallet', id],
+    queryFn: () => api.getSolanaWallet(id),
+    enabled: !!id,
+  });
+
+  const generateSolanaWalletMutation = useMutation({
+    mutationFn: () => api.generateSolanaWallet(id),
+    onSuccess: () => {
+      refetchSolanaWallet();
+      queryClient.invalidateQueries({ queryKey: ['solanaWallet', id] });
+    },
+  });
+
+  const importSolanaWalletMutation = useMutation({
+    mutationFn: (privateKey: string) => api.importSolanaWallet(id, privateKey),
+    onSuccess: () => {
+      refetchSolanaWallet();
+      setIsImportSolanaWalletOpen(false);
+      setImportSolanaPrivateKey('');
+      queryClient.invalidateQueries({ queryKey: ['solanaWallet', id] });
+    },
+  });
+
+  const deleteSolanaWalletMutation = useMutation({
+    mutationFn: () => api.deleteSolanaWallet(id),
+    onSuccess: () => {
+      refetchSolanaWallet();
+      queryClient.invalidateQueries({ queryKey: ['solanaWallet', id] });
     },
   });
 
@@ -498,22 +534,23 @@ export default function FacilitatorDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Wallet Management Card */}
+            {/* EVM Wallet Card (Base/Ethereum) */}
             <Card className={walletInfo?.hasWallet ? 'border-green-500/50' : 'border-yellow-500/50'}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Wallet className="w-4 h-4" />
-                  Settlement Wallet
+                  EVM Wallet
+                  <span className="text-xs text-muted-foreground">(Base)</span>
                   {walletInfo?.hasWallet ? (
                     <span className="text-xs bg-green-500/20 text-green-500 px-2 py-0.5 rounded-full">Active</span>
                   ) : (
-                    <span className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded-full">Not Configured</span>
+                    <span className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded-full">Not Set</span>
                   )}
                 </CardTitle>
                 <CardDescription>
                   {walletInfo?.hasWallet 
-                    ? 'This wallet submits settlement transactions'
-                    : 'Required for processing payments'
+                    ? 'Submits Base & Ethereum settlements'
+                    : 'Required for Base payments'
                   }
                 </CardDescription>
               </CardHeader>
@@ -642,6 +679,151 @@ export default function FacilitatorDetailPage() {
                     {generateWalletMutation.isError && (
                       <p className="text-sm text-destructive">
                         {generateWalletMutation.error?.message || 'Failed to generate wallet'}
+                      </p>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Solana Wallet Card */}
+            <Card className={solanaWalletInfo?.hasWallet ? 'border-green-500/50' : 'border-yellow-500/50'}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Wallet className="w-4 h-4" />
+                  Solana Wallet
+                  {solanaWalletInfo?.hasWallet ? (
+                    <span className="text-xs bg-green-500/20 text-green-500 px-2 py-0.5 rounded-full">Active</span>
+                  ) : (
+                    <span className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded-full">Not Set</span>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  {solanaWalletInfo?.hasWallet 
+                    ? 'Submits Solana settlements'
+                    : 'Required for Solana payments'
+                  }
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {solanaWalletInfo?.hasWallet ? (
+                  <>
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Address</Label>
+                      <div className="flex items-center gap-2 font-mono text-sm bg-muted p-2 rounded">
+                        <span className="truncate">{solanaWalletInfo.address}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 shrink-0"
+                          onClick={() => {
+                            navigator.clipboard.writeText(solanaWalletInfo.address || '');
+                            setCopiedSolanaAddress(true);
+                            setTimeout(() => setCopiedSolanaAddress(false), 2000);
+                          }}
+                        >
+                          {copiedSolanaAddress ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {solanaWalletInfo.balance && (
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Balance</Label>
+                        <div className="flex justify-between text-sm bg-muted p-2 rounded">
+                          <span>Solana</span>
+                          <span className="font-mono">{solanaWalletInfo.balance.sol} SOL</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="pt-2 border-t">
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Fund this address with SOL for transaction fees.
+                      </p>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => {
+                          if (confirm('Are you sure? This will remove the Solana wallet and stop Solana settlements.')) {
+                            deleteSolanaWalletMutation.mutate();
+                          }
+                        }}
+                        disabled={deleteSolanaWalletMutation.isPending}
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Remove Wallet
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      A Solana wallet is required for Solana payments. Generate or import one.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => generateSolanaWalletMutation.mutate()}
+                        disabled={generateSolanaWalletMutation.isPending}
+                        className="flex-1"
+                      >
+                        {generateSolanaWalletMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Plus className="w-4 h-4 mr-2" />
+                        )}
+                        Generate
+                      </Button>
+                      <Dialog open={isImportSolanaWalletOpen} onOpenChange={setIsImportSolanaWalletOpen}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" className="flex-1">
+                            <Import className="w-4 h-4 mr-2" />
+                            Import
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Import Solana Private Key</DialogTitle>
+                            <DialogDescription>
+                              Enter your Solana private key (base58 encoded). It will be encrypted and stored securely.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4 py-4">
+                            <div>
+                              <Label htmlFor="solanaPrivateKey">Private Key</Label>
+                              <Input
+                                id="solanaPrivateKey"
+                                type="password"
+                                placeholder="base58 encoded key..."
+                                value={importSolanaPrivateKey}
+                                onChange={(e) => setImportSolanaPrivateKey(e.target.value)}
+                              />
+                              <p className="text-xs text-muted-foreground mt-1">
+                                64-byte base58-encoded Solana keypair
+                              </p>
+                            </div>
+                            <Button
+                              onClick={() => importSolanaWalletMutation.mutate(importSolanaPrivateKey)}
+                              disabled={importSolanaWalletMutation.isPending || !importSolanaPrivateKey}
+                              className="w-full"
+                            >
+                              {importSolanaWalletMutation.isPending ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              ) : null}
+                              Import Wallet
+                            </Button>
+                            {importSolanaWalletMutation.isError && (
+                              <p className="text-sm text-destructive">
+                                {importSolanaWalletMutation.error?.message || 'Failed to import Solana wallet'}
+                              </p>
+                            )}
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                    {generateSolanaWalletMutation.isError && (
+                      <p className="text-sm text-destructive">
+                        {generateSolanaWalletMutation.error?.message || 'Failed to generate Solana wallet'}
                       </p>
                     )}
                   </>

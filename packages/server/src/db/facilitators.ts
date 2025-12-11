@@ -91,6 +91,7 @@ export function updateFacilitator(
     supported_chains: string;
     supported_tokens: string;
     encrypted_private_key: string;
+    encrypted_solana_private_key: string;
   }>
 ): FacilitatorRecord | null {
   const db = getDatabase();
@@ -118,6 +119,10 @@ export function updateFacilitator(
   if (updates.encrypted_private_key !== undefined) {
     fields.push('encrypted_private_key = ?');
     values.push(updates.encrypted_private_key);
+  }
+  if (updates.encrypted_solana_private_key !== undefined) {
+    fields.push('encrypted_solana_private_key = ?');
+    values.push(updates.encrypted_solana_private_key);
   }
 
   if (fields.length === 0) {

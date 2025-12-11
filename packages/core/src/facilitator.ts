@@ -12,6 +12,7 @@ import type {
 } from './types.js';
 import { getChainIdFromNetwork, getNetworkFromChainId, defaultChains } from './chains.js';
 import { executeERC3009Settlement } from './erc3009.js';
+import { executeSolanaSettlement } from './solana.js';
 
 /**
  * Chain ID to viem chain mapping (EVM chains only)
@@ -255,13 +256,31 @@ export class Facilitator {
         }
       }
 
-      // Handle Solana (not implemented yet)
-      if (chainId === 'solana') {
-        return {
-          success: false,
-          errorMessage: 'Solana settlement not yet implemented',
-          network: requirements.network,
-        };
+      // Handle Solana chains
+      if (chainId === 'solana' || chainId === 'solana-devnet') {
+        // For Solana, the payload should contain the signed transaction
+        // The private key format is different (base58 for Solana)
+        const result = await executeSolanaSettlement({
+          network: chainId as 'solana' | 'solana-devnet',
+          signedTransaction: payload.signature as string, // The "signature" field contains the signed tx
+          facilitatorPrivateKey: privateKey.startsWith('0x') 
+            ? privateKey.slice(2) // Remove 0x prefix if present (shouldn't be for Solana)
+            : privateKey,
+        });
+
+        if (result.success) {
+          return {
+            success: true,
+            transactionHash: result.transactionHash,
+            network: requirements.network,
+          };
+        } else {
+          return {
+            success: false,
+            errorMessage: result.errorMessage,
+            network: requirements.network,
+          };
+        }
       }
 
       return {

@@ -63,6 +63,12 @@ export interface WalletInfo {
   balances: Record<string, { balance: string; formatted: string }>;
 }
 
+export interface SolanaWalletInfo {
+  hasWallet: boolean;
+  address: string | null;
+  balance: { sol: string; lamports: string } | null;
+}
+
 export interface WalletGenerateResponse {
   success: boolean;
   address: string;
@@ -201,6 +207,30 @@ class ApiClient {
 
   async deleteWallet(facilitatorId: string): Promise<{ success: boolean; message: string }> {
     return this.request(`/api/admin/facilitators/${facilitatorId}/wallet`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Solana Wallet Management
+  async getSolanaWallet(facilitatorId: string): Promise<SolanaWalletInfo> {
+    return this.request(`/api/admin/facilitators/${facilitatorId}/wallet/solana`);
+  }
+
+  async generateSolanaWallet(facilitatorId: string): Promise<WalletGenerateResponse> {
+    return this.request(`/api/admin/facilitators/${facilitatorId}/wallet/solana`, {
+      method: 'POST',
+    });
+  }
+
+  async importSolanaWallet(facilitatorId: string, privateKey: string): Promise<WalletGenerateResponse> {
+    return this.request(`/api/admin/facilitators/${facilitatorId}/wallet/solana/import`, {
+      method: 'POST',
+      body: JSON.stringify({ privateKey }),
+    });
+  }
+
+  async deleteSolanaWallet(facilitatorId: string): Promise<{ success: boolean; message: string }> {
+    return this.request(`/api/admin/facilitators/${facilitatorId}/wallet/solana`, {
       method: 'DELETE',
     });
   }
