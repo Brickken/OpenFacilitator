@@ -208,14 +208,61 @@ export async function executeSolanaSettlement(
       });
     }
 
-    // Return immediately after broadcast - don't wait for confirmation
-    // This makes the response much faster (~2-3 seconds saved)
-    // The transaction is already submitted to the network
-    console.log('[SolanaSettlement] SUCCESS! Returning signature:', signature);
-    return {
-      success: true,
-      transactionHash: signature,
-    };
+    // Wait for transaction confirmation before returning success
+    // This ensures downstream consumers can verify the transaction on-chain
+    console.log('[SolanaSettlement] Waiting for confirmation...');
+    try {
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+      const confirmation = await connection.confirmTransaction(
+        {
+          signature,
+          blockhash,
+          lastValidBlockHeight,
+        },
+        'confirmed'
+      );
+
+      if (confirmation.value.err) {
+        console.error('[SolanaSettlement] Transaction failed on-chain:', confirmation.value.err);
+        return {
+          success: false,
+          transactionHash: signature,
+          errorMessage: `Transaction failed: ${JSON.stringify(confirmation.value.err)}`,
+        };
+      }
+
+      console.log('[SolanaSettlement] SUCCESS! Transaction confirmed:', signature);
+      return {
+        success: true,
+        transactionHash: signature,
+      };
+    } catch (confirmError) {
+      // If confirmation times out but tx was sent, still return success
+      // The transaction may still land, just confirmation timed out
+      console.warn('[SolanaSettlement] Confirmation timeout, but tx was sent:', signature);
+      console.warn('[SolanaSettlement] Error:', confirmError);
+
+      // Check if the transaction landed anyway
+      try {
+        const status = await connection.getSignatureStatus(signature);
+        if (status.value?.confirmationStatus === 'confirmed' || status.value?.confirmationStatus === 'finalized') {
+          console.log('[SolanaSettlement] Transaction confirmed on retry check:', signature);
+          return {
+            success: true,
+            transactionHash: signature,
+          };
+        }
+      } catch {
+        // Ignore status check errors
+      }
+
+      // Return the error - transaction may or may not have landed
+      return {
+        success: false,
+        transactionHash: signature,
+        errorMessage: `Transaction sent but confirmation failed: ${confirmError instanceof Error ? confirmError.message : 'Timeout'}`,
+      };
+    }
   } catch (error) {
     console.error('[SolanaSettlement] ERROR:', error);
     

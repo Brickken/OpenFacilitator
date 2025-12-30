@@ -1,0 +1,58 @@
+# Installation
+
+## Package Manager
+
+```bash
+# npm
+npm install @openfacilitator/sdk
+
+# yarn
+yarn add @openfacilitator/sdk
+
+# pnpm
+pnpm add @openfacilitator/sdk
+```
+
+## Configuration
+
+```typescript
+import { OpenFacilitator } from '@openfacilitator/sdk';
+
+const facilitator = new OpenFacilitator({
+  // Required: Facilitator URL
+  url: 'https://x402.openfacilitator.io',
+
+  // Optional: Request timeout (default: 30000ms)
+  timeout: 30000,
+
+  // Optional: Custom headers
+  headers: {
+    'X-Custom-Header': 'value',
+  },
+});
+```
+
+## Default Facilitator
+
+Use the shared OpenFacilitator instance:
+
+```typescript
+import { createDefaultFacilitator } from '@openfacilitator/sdk';
+
+const facilitator = createDefaultFacilitator();
+// Uses https://x402.openfacilitator.io
+```
+
+## TypeScript
+
+The SDK is written in TypeScript and includes full type definitions:
+
+```typescript
+import type {
+  PaymentPayload,
+  PaymentRequirements,
+  VerifyResponse,
+  SettleResponse,
+  SupportedResponse
+} from '@openfacilitator/sdk';
+```
