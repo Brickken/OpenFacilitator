@@ -17,7 +17,8 @@
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "seed": "tsx scripts/seed-transactions.ts"
   },
   "dependencies": {
     "@openfacilitator/core": "workspace:*",

@@ -2,24 +2,21 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   Copy,
   Check,
   ExternalLink,
-  Download,
   Activity,
   Globe,
   Key,
   Settings,
-  ShieldCheck,
   AlertCircle,
   AlertTriangle,
   CheckCircle2,
   Loader2,
-  Plus,
   Trash2,
   Pencil,
 } from 'lucide-react';
@@ -36,26 +33,33 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { api, type Transaction } from '@/lib/api';
-import { formatDate, formatAddress } from '@/lib/utils';
+import { api } from '@/lib/api';
+import { formatDate, formatAddress, cn } from '@/lib/utils';
 import { Navbar } from '@/components/navbar';
 import { NetworksSection, useNetworkStats } from '@/components/networks-section';
+import { TransactionsTable } from '@/components/transactions-table';
+import { SettlementActivityChart } from '@/components/settlement-activity-chart';
 
-const networkNames: Record<string | number, string> = {
-  8453: 'Base',
-  84532: 'Base Sepolia',
-  1: 'Ethereum',
-  11155111: 'Sepolia',
-  'solana': 'Solana',
-  'solana-devnet': 'Solana Devnet',
-};
+type Tab = 'transactions' | 'settings';
 
 export default function FacilitatorDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab = (searchParams.get('tab') as Tab) || 'transactions';
+
+  const setActiveTab = (tab: Tab) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === 'transactions') {
+      params.delete('tab');
+    } else {
+      params.set('tab', tab);
+    }
+    router.push(`?${params.toString()}`, { scroll: false });
+  };
+
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedDns, setCopiedDns] = useState(false);
-  const [isExportOpen, setIsExportOpen] = useState(false);
   const [isChangeDomainOpen, setIsChangeDomainOpen] = useState(false);
   const [isEditInfoOpen, setIsEditInfoOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -73,7 +77,7 @@ export default function FacilitatorDetailPage() {
     queryKey: ['domainStatus', id],
     queryFn: () => api.getDomainStatus(id),
     enabled: !!facilitator?.customDomain,
-    refetchInterval: (query) => (query.state.data?.status === 'pending' ? 10000 : false), // Poll every 10s if pending
+    refetchInterval: (query) => (query.state.data?.status === 'pending' ? 10000 : false),
   });
 
   const setupDomainMutation = useMutation({
@@ -109,13 +113,6 @@ export default function FacilitatorDetailPage() {
     enabled: !!id,
   });
 
-  const { data: exportConfig, refetch: fetchExport } = useQuery({
-    queryKey: ['export', id],
-    queryFn: () => api.exportConfig(id),
-    enabled: false,
-  });
-
-  // Network stats for the stats card
   const networkStats = useNetworkStats(id);
 
   const deleteFacilitatorMutation = useMutation({
@@ -130,21 +127,6 @@ export default function FacilitatorDetailPage() {
     await navigator.clipboard.writeText(text);
     setCopiedUrl(true);
     setTimeout(() => setCopiedUrl(false), 2000);
-  };
-
-  const handleExport = async () => {
-    await fetchExport();
-    setIsExportOpen(true);
-  };
-
-  const downloadFile = (content: string, filename: string) => {
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
   };
 
   if (isLoading) {
@@ -172,7 +154,6 @@ export default function FacilitatorDetailPage() {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      {/* Main */}
       <main className="max-w-7xl mx-auto px-6 pt-24 pb-10 min-h-screen">
         {/* Back link */}
         <Link
@@ -183,8 +164,8 @@ export default function FacilitatorDetailPage() {
           Back to dashboard
         </Link>
 
-        {/* Facilitator header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <div className="flex items-center gap-2 mb-2">
               <h1 className="text-3xl font-bold">{facilitator.name}</h1>
@@ -254,229 +235,247 @@ export default function FacilitatorDetailPage() {
               </a>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Dialog open={isExportOpen} onOpenChange={setIsExportOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" onClick={handleExport}>
-                  <Download className="w-4 h-4 mr-2" />
-                  Export for Self-Host
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Self-Host Configuration</DialogTitle>
-                  <DialogDescription>
-                    Download the configuration files to run this facilitator on your own infrastructure.
-                  </DialogDescription>
-                </DialogHeader>
-                {exportConfig && (
-                  <div className="space-y-4 py-4">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => downloadFile(exportConfig.dockerCompose, 'docker-compose.yml')}
-                      >
-                        <Download className="w-4 h-4 mr-1" />
-                        docker-compose.yml
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => downloadFile(exportConfig.envFile, '.env')}
-                      >
-                        <Download className="w-4 h-4 mr-1" />
-                        .env
-                      </Button>
-                    </div>
-                    <div className="bg-muted rounded-lg p-4">
-                      <pre className="text-xs text-muted-foreground whitespace-pre-wrap">
-                        {exportConfig.instructions}
-                      </pre>
-                    </div>
-                  </div>
-                )}
-              </DialogContent>
-            </Dialog>
-          </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid sm:grid-cols-4 gap-6 mb-10">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Total Settled</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <span className="text-2xl font-bold text-primary">
-                ${transactionsData?.stats?.totalAmountSettled ?? '0.00'}
-              </span>
-              <p className="text-xs text-muted-foreground mt-1">USDC</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Total Verifications</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <span className="text-2xl font-bold">
-                {transactionsData?.stats?.totalVerifications ?? 0}
-              </span>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Total Settlements</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <span className="text-2xl font-bold">
-                {transactionsData?.stats?.totalSettlements ?? 0}
-              </span>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Wallets</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <span className="text-2xl font-bold">
-                {networkStats.walletsConfigured}/{networkStats.totalWallets}
-              </span>
-              <p className="text-xs text-muted-foreground mt-1">
-                {networkStats.networksEnabled} networks enabled
-              </p>
-            </CardContent>
-          </Card>
+        {/* Tabs */}
+        <div className="border-b border-border mb-6">
+          <nav className="flex gap-8">
+            <button
+              onClick={() => setActiveTab('transactions')}
+              className={cn(
+                'pb-3 text-sm font-medium border-b-2 -mb-px transition-colors',
+                activeTab === 'transactions'
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              )}
+            >
+              Transactions
+            </button>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={cn(
+                'pb-3 text-sm font-medium border-b-2 -mb-px transition-colors',
+                activeTab === 'settings'
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              )}
+            >
+              Settings
+            </button>
+          </nav>
         </div>
 
-        {/* Configuration & Transactions */}
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Configuration */}
-          <div className="lg:col-span-1 space-y-6">
+        {/* Tab Content */}
+        {activeTab === 'transactions' ? (
+          <div className="space-y-6">
+            {/* Stats Row */}
+            <div className="grid sm:grid-cols-4 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Total Settled</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <span className="text-2xl font-bold text-primary">
+                    ${transactionsData?.stats?.totalAmountSettled ?? '0.00'}
+                  </span>
+                  <p className="text-xs text-muted-foreground mt-1">USDC</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Total Verifications</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <span className="text-2xl font-bold">
+                    {transactionsData?.stats?.totalVerifications ?? 0}
+                  </span>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Total Settlements</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <span className="text-2xl font-bold">
+                    {transactionsData?.stats?.totalSettlements ?? 0}
+                  </span>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Wallets</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <span className="text-2xl font-bold">
+                    {networkStats.walletsConfigured}/{networkStats.totalWallets}
+                  </span>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {networkStats.networksEnabled} networks enabled
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Chart */}
+            <SettlementActivityChart transactions={transactionsData?.transactions || []} />
+
+            {/* Transactions Table */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Settings className="w-4 h-4" />
-                  Configuration
+                  <Activity className="w-4 h-4" />
+                  Recent Transactions
                 </CardTitle>
+                <CardDescription>Payment verifications and settlements</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label className="text-muted-foreground">Domain</Label>
-                  {facilitator.customDomain ? (
-                    <div className="flex items-center gap-2">
-                      <p className="font-mono">{facilitator.customDomain}</p>
-                      {domainStatus?.status === 'active' && (
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
-                      )}
-                      {domainStatus?.status === 'pending' && (
-                        <AlertCircle className="w-4 h-4 text-yellow-500" />
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground text-sm">Not configured</p>
-                  )}
-                  <Dialog open={isChangeDomainOpen} onOpenChange={setIsChangeDomainOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm" className="mt-2">
-                        {facilitator.customDomain ? 'Change Domain' : 'Add Custom Domain'}
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>{facilitator.customDomain ? 'Change Custom Domain' : 'Add Custom Domain'}</DialogTitle>
-                        <DialogDescription>
-                          {facilitator.customDomain 
-                            ? `Current domain: ${facilitator.customDomain}. Enter a new domain to replace it.`
-                            : 'Enter your custom domain to use instead of the default subdomain.'
-                          }
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="newDomain">Domain</Label>
-                          <Input
-                            id="newDomain"
-                            placeholder="pay.yourdomain.com"
-                            value={newDomain}
-                            onChange={(e) => setNewDomain(e.target.value.toLowerCase().replace(/[^a-z0-9.-]/g, ''))}
-                          />
-                        </div>
-                        <div className="rounded-lg bg-muted/50 p-4 text-sm">
-                          <div className="font-medium mb-2">DNS Setup Required</div>
-                          <div className="text-muted-foreground space-y-1">
-                            <p>After saving, add a CNAME record pointing to:</p>
-                            <code className="block bg-background px-2 py-1 rounded text-xs font-mono mt-1">
-                              api.openfacilitator.io
-                            </code>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex justify-between">
-                        {facilitator.customDomain && (
-                          <Button
-                            variant="destructive"
-                            onClick={() => {
-                              if (confirm('Remove custom domain? The subdomain will still work.')) {
-                                updateDomainMutation.mutate(null);
-                              }
-                            }}
-                            disabled={updateDomainMutation.isPending}
-                          >
-                            Remove Domain
-                          </Button>
-                        )}
-                        <div className="flex gap-2 ml-auto">
-                          <Button variant="outline" onClick={() => setIsChangeDomainOpen(false)}>
-                            Cancel
-                          </Button>
-                          <Button
-                            onClick={() => updateDomainMutation.mutate(newDomain)}
-                            disabled={!newDomain || updateDomainMutation.isPending}
-                          >
-                            {updateDomainMutation.isPending ? (
-                              <>
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                Saving...
-                              </>
-                            ) : (
-                              'Save Domain'
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Owner Address</Label>
-                  <p className="font-mono text-sm">{formatAddress(facilitator.ownerAddress)}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Created</Label>
-                  <p>{formatDate(facilitator.createdAt)}</p>
-                </div>
+              <CardContent>
+                <TransactionsTable transactions={transactionsData?.transactions || []} />
               </CardContent>
             </Card>
-
-            {/* Domain Setup Card */}
-            {facilitator.customDomain ? (
-              <Card className={domainStatus?.status === 'active' ? 'border-green-500/50' : domainStatus?.status === 'pending' ? 'border-yellow-500/50' : ''}>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Row 1: Configuration + Domain Setup */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Configuration Card */}
+              <Card className="h-full">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Globe className="w-4 h-4" />
-                    Domain Setup
+                    <Settings className="w-4 h-4" />
+                    Configuration
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-muted-foreground">Domain</Label>
+                      {facilitator.customDomain ? (
+                        <div className="flex items-center gap-2">
+                          <p className="font-mono">{facilitator.customDomain}</p>
+                          {domainStatus?.status === 'active' && (
+                            <span className="w-2 h-2 rounded-full bg-green-500" />
+                          )}
+                          {domainStatus?.status === 'pending' && (
+                            <span className="w-2 h-2 rounded-full bg-yellow-500" />
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-muted-foreground text-sm">Not configured</p>
+                      )}
+                    </div>
+                    <Dialog open={isChangeDomainOpen} onOpenChange={setIsChangeDomainOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          {facilitator.customDomain ? 'Change' : 'Add'}
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>{facilitator.customDomain ? 'Change Custom Domain' : 'Add Custom Domain'}</DialogTitle>
+                          <DialogDescription>
+                            {facilitator.customDomain
+                              ? `Current domain: ${facilitator.customDomain}. Enter a new domain to replace it.`
+                              : 'Enter your custom domain to use instead of the default subdomain.'
+                            }
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="newDomain">Domain</Label>
+                            <Input
+                              id="newDomain"
+                              placeholder="pay.yourdomain.com"
+                              value={newDomain}
+                              onChange={(e) => setNewDomain(e.target.value.toLowerCase().replace(/[^a-z0-9.-]/g, ''))}
+                            />
+                          </div>
+                          <div className="rounded-lg bg-muted/50 p-4 text-sm">
+                            <div className="font-medium mb-2">DNS Setup Required</div>
+                            <div className="text-muted-foreground space-y-1">
+                              <p>After saving, add a CNAME record pointing to:</p>
+                              <code className="block bg-background px-2 py-1 rounded text-xs font-mono mt-1">
+                                api.openfacilitator.io
+                              </code>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex justify-between">
+                          {facilitator.customDomain && (
+                            <Button
+                              variant="destructive"
+                              onClick={() => {
+                                if (confirm('Remove custom domain? The subdomain will still work.')) {
+                                  updateDomainMutation.mutate(null);
+                                }
+                              }}
+                              disabled={updateDomainMutation.isPending}
+                            >
+                              Remove Domain
+                            </Button>
+                          )}
+                          <div className="flex gap-2 ml-auto">
+                            <Button variant="outline" onClick={() => setIsChangeDomainOpen(false)}>
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={() => updateDomainMutation.mutate(newDomain)}
+                              disabled={!newDomain || updateDomainMutation.isPending}
+                            >
+                              {updateDomainMutation.isPending ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Saving...
+                                </>
+                              ) : (
+                                'Save Domain'
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Owner Address</Label>
+                    <p className="font-mono text-sm">{formatAddress(facilitator.ownerAddress)}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Created</Label>
+                    <p>{formatDate(facilitator.createdAt)}</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Domain Setup Card */}
+              <Card className={cn(
+                'h-full',
+                domainStatus?.status === 'active' ? 'border-green-500/50' : domainStatus?.status === 'pending' ? 'border-yellow-500/50' : ''
+              )}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <Globe className="w-4 h-4" />
+                      Domain Setup
+                    </CardTitle>
                     {domainStatus?.status === 'active' && (
                       <span className="text-xs bg-green-500/20 text-green-500 px-2 py-0.5 rounded-full">Active</span>
                     )}
                     {domainStatus?.status === 'pending' && (
-                      <span className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded-full">Pending DNS</span>
+                      <span className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded-full">Pending</span>
                     )}
-                  </CardTitle>
+                    {!facilitator.customDomain && (
+                      <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">Not Set</span>
+                    )}
+                  </div>
                   <CardDescription>Configure DNS for your custom domain</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {domainStatus?.status === 'active' ? (
+                  {!facilitator.customDomain ? (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <AlertCircle className="w-5 h-5" />
+                      <span>Add a domain in Configuration to get started</span>
+                    </div>
+                  ) : domainStatus?.status === 'active' ? (
                     <div className="flex items-center gap-2 text-green-500">
                       <CheckCircle2 className="w-5 h-5" />
                       <span>Domain is active and SSL is provisioned!</span>
@@ -545,10 +544,10 @@ export default function FacilitatorDetailPage() {
                           </div>
                         )}
                       </div>
-                      
+
                       <div className="flex gap-2">
                         {domainStatus?.status === 'not_added' && domainStatus.railwayConfigured && (
-                          <Button 
+                          <Button
                             onClick={() => setupDomainMutation.mutate()}
                             disabled={setupDomainMutation.isPending}
                             className="flex-1"
@@ -563,8 +562,8 @@ export default function FacilitatorDetailPage() {
                             )}
                           </Button>
                         )}
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           onClick={() => refetchDomainStatus()}
                           className="flex-1"
                         >
@@ -574,46 +573,19 @@ export default function FacilitatorDetailPage() {
 
                       {domainStatus?.status === 'pending' && (
                         <p className="text-xs text-muted-foreground">
-                          DNS changes can take up to 48 hours to propagate. We&apos;ll check automatically.
+                          DNS changes can take up to 48 hours to propagate.
                         </p>
                       )}
                     </>
                   )}
                 </CardContent>
               </Card>
-            ) : (
-              <Card className="border-yellow-500/50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Globe className="w-4 h-4" />
-                    Domain Setup
-                    <span className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded-full">Required</span>
-                  </CardTitle>
-                  <CardDescription>Add your custom domain to start accepting payments</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center gap-2 text-yellow-500">
-                    <AlertCircle className="w-5 h-5" />
-                    <span>No domain configured</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Add a custom domain to your facilitator to make it accessible to users.
-                  </p>
-                  <Dialog open={isChangeDomainOpen} onOpenChange={setIsChangeDomainOpen}>
-                    <DialogTrigger asChild>
-                      <Button className="w-full">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Custom Domain
-                      </Button>
-                    </DialogTrigger>
-                  </Dialog>
-                </CardContent>
-              </Card>
-            )}
+            </div>
 
-            {/* Networks Section */}
+            {/* Networks Section (with grid wallet cards) */}
             <NetworksSection facilitatorId={id} />
 
+            {/* API Endpoints */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -636,208 +608,94 @@ export default function FacilitatorDetailPage() {
                 </div>
               </CardContent>
             </Card>
-          </div>
 
-          {/* Transactions */}
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="w-4 h-4" />
-                Recent Transactions
-              </CardTitle>
-              <CardDescription>Payment verifications and settlements</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {!transactionsData?.transactions.length ? (
-                <div className="text-center py-12">
-                  <Activity className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No transactions yet</p>
-                  <p className="text-sm text-muted-foreground">
-                    Transactions will appear here when payments are processed.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {transactionsData.transactions.map((tx: Transaction) => {
-                    // Build explorer URL for transaction hash
-                    const getExplorerUrl = () => {
-                      if (!tx.transactionHash) return null;
-                      if (tx.network === 'solana' || tx.network === 'solana-mainnet') {
-                        return `https://solscan.io/tx/${tx.transactionHash}`;
-                      }
-                      if (tx.network === 'solana-devnet') {
-                        return `https://solscan.io/tx/${tx.transactionHash}?cluster=devnet`;
-                      }
-                      if (tx.network === '8453' || tx.network === 'base') {
-                        return `https://basescan.org/tx/${tx.transactionHash}`;
-                      }
-                      if (tx.network === '84532' || tx.network === 'base-sepolia') {
-                        return `https://sepolia.basescan.org/tx/${tx.transactionHash}`;
-                      }
-                      if (tx.network === '1' || tx.network === 'ethereum') {
-                        return `https://etherscan.io/tx/${tx.transactionHash}`;
-                      }
-                      return null;
-                    };
-                    const explorerUrl = getExplorerUrl();
-
-                    return (
-                      <div
-                        key={tx.id}
-                        className="flex items-center justify-between p-4 rounded-lg bg-muted"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div
-                            className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                              tx.type === 'verify' ? 'bg-blue-500/20' : 'bg-primary/20'
-                            }`}
-                          >
-                            {tx.type === 'verify' ? (
-                              <Check className="w-4 h-4 text-blue-500" />
-                            ) : (
-                              <ShieldCheck className="w-4 h-4 text-primary" />
-                            )}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium capitalize">{tx.type}</p>
-                              {tx.type === 'settle' && explorerUrl && (
-                                <a
-                                  href={explorerUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-muted-foreground hover:text-primary"
-                                  title="View on explorer"
-                                >
-                                  <ExternalLink className="w-3 h-3" />
-                                </a>
-                              )}
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              {formatAddress(tx.fromAddress)} → {formatAddress(tx.toAddress)}
-                            </p>
-                            {tx.type === 'settle' && tx.transactionHash && (
-                              <p className="text-xs text-muted-foreground font-mono">
-                                {formatAddress(tx.transactionHash)}
-                              </p>
-                            )}
-                          </div>
+            {/* Danger Zone */}
+            <Card className="border-red-500/50 dark:border-red-900/50 bg-red-500/5 dark:bg-red-950/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                  <AlertTriangle className="w-4 h-4" />
+                  Danger Zone
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <p className="font-medium">Delete this facilitator</p>
+                    <p className="text-sm text-muted-foreground">
+                      Permanently delete this facilitator, all transaction history, and custom domains.
+                    </p>
+                  </div>
+                  <Dialog open={isDeleteOpen} onOpenChange={(open) => {
+                    setIsDeleteOpen(open);
+                    if (!open) setDeleteConfirmName('');
+                  }}>
+                    <DialogTrigger asChild>
+                      <Button variant="destructive" className="shrink-0">
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete Facilitator
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Delete {facilitator.name}?</DialogTitle>
+                        <DialogDescription>
+                          This action cannot be undone. Type the facilitator name to confirm.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="py-4 space-y-4">
+                        <div className="p-4 rounded-lg bg-red-500/10 dark:bg-red-950/30 border border-red-500/20 dark:border-red-900/30">
+                          <p className="text-sm text-red-600 dark:text-red-400">
+                            This will permanently delete:
+                          </p>
+                          <ul className="mt-2 text-sm text-red-600/80 dark:text-red-400/80 list-disc list-inside space-y-1">
+                            <li>The facilitator configuration</li>
+                            <li>All transaction history</li>
+                            <li>Associated wallets and keys</li>
+                            <li>Custom domain settings</li>
+                          </ul>
                         </div>
-                        <div className="text-right">
-                          <p className="font-mono">{tx.amount}</p>
-                          <p className="text-sm text-muted-foreground">{formatDate(tx.createdAt)}</p>
+                        <div className="space-y-2">
+                          <Label htmlFor="confirmName">
+                            Type <span className="font-mono font-semibold">{facilitator.name}</span> to confirm
+                          </Label>
+                          <Input
+                            id="confirmName"
+                            value={deleteConfirmName}
+                            onChange={(e) => setDeleteConfirmName(e.target.value)}
+                            placeholder={facilitator.name}
+                          />
                         </div>
-                        <div
-                          className={`px-2 py-1 rounded text-xs font-medium ${
-                            tx.status === 'success'
-                              ? 'bg-primary/20 text-primary'
-                              : tx.status === 'pending'
-                                ? 'bg-yellow-500/20 text-yellow-500'
-                                : 'bg-destructive/20 text-destructive'
-                          }`}
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          onClick={() => deleteFacilitatorMutation.mutate()}
+                          disabled={deleteConfirmName !== facilitator.name || deleteFacilitatorMutation.isPending}
                         >
-                          {tx.status}
-                        </div>
-                      </div>
-                    );
-                  })}
+                          {deleteFacilitatorMutation.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Deleting...
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Facilitator
+                            </>
+                          )}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Danger Zone */}
-        <div className="mt-10">
-          <Card className="border-red-500/50 dark:border-red-900/50 bg-red-500/5 dark:bg-red-950/20">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
-                <AlertTriangle className="w-5 h-5" />
-                Danger Zone
-              </CardTitle>
-              <CardDescription className="text-red-600/80 dark:text-red-400/80">
-                Irreversible actions for this facilitator
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <p className="font-medium">Delete this facilitator</p>
-                  <p className="text-sm text-muted-foreground">
-                    This will permanently delete this facilitator, all transaction history, and remove any custom domains. This cannot be undone.
-                  </p>
-                </div>
-                <Dialog open={isDeleteOpen} onOpenChange={(open) => {
-                  setIsDeleteOpen(open);
-                  if (!open) setDeleteConfirmName('');
-                }}>
-                  <DialogTrigger asChild>
-                    <Button variant="destructive" className="shrink-0">
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Delete Facilitator
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Delete {facilitator.name}?</DialogTitle>
-                      <DialogDescription>
-                        This action cannot be undone. Type the facilitator name to confirm.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4 space-y-4">
-                      <div className="p-4 rounded-lg bg-red-500/10 dark:bg-red-950/30 border border-red-500/20 dark:border-red-900/30">
-                        <p className="text-sm text-red-600 dark:text-red-400">
-                          This will permanently delete:
-                        </p>
-                        <ul className="mt-2 text-sm text-red-600/80 dark:text-red-400/80 list-disc list-inside space-y-1">
-                          <li>The facilitator configuration</li>
-                          <li>All transaction history</li>
-                          <li>Associated wallets and keys</li>
-                          <li>Custom domain settings</li>
-                        </ul>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="confirmName">
-                          Type <span className="font-mono font-semibold">{facilitator.name}</span> to confirm
-                        </Label>
-                        <Input
-                          id="confirmName"
-                          value={deleteConfirmName}
-                          onChange={(e) => setDeleteConfirmName(e.target.value)}
-                          placeholder={facilitator.name}
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        onClick={() => deleteFacilitatorMutation.mutate()}
-                        disabled={deleteConfirmName !== facilitator.name || deleteFacilitatorMutation.isPending}
-                      >
-                        {deleteFacilitatorMutation.isPending ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Deleting...
-                          </>
-                        ) : (
-                          <>
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete Facilitator
-                          </>
-                        )}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </main>
     </div>
   );
 }
-

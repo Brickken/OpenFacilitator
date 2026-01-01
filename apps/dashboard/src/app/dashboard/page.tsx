@@ -6,206 +6,35 @@ import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
-  ExternalLink,
-  Settings,
   Copy,
   Check,
-  Sparkles,
   Loader2,
-  Wallet,
-  AlertCircle,
-  AlertTriangle,
   RefreshCw,
   HelpCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { api, type Facilitator } from '@/lib/api';
-import { formatDate } from '@/lib/utils';
 import { useAuth } from '@/components/auth/auth-provider';
 import { Navbar } from '@/components/navbar';
 import { useToast } from '@/hooks/use-toast';
 import { useDomainStatus } from '@/hooks/use-domain-status';
-import { SubscriptionConfirmDialog } from '@/components/subscription-confirm-dialog';
-import { SubscriptionSuccessDialog } from '@/components/subscription-success-dialog';
+import { FacilitatorCard } from '@/components/facilitator-card';
+import { CreateFacilitatorCard } from '@/components/create-facilitator-card';
+import { CreateFacilitatorModal } from '@/components/create-facilitator-modal';
+import { BillingSection } from '@/components/billing-section';
+import { EmptyState } from '@/components/empty-state';
 
 const FREE_ENDPOINT = 'https://x402.openfacilitator.io';
 
-// Status indicator component
-function StatusIndicator({ status }: { status: 'active' | 'pending' | 'not_ready' | 'checking' }) {
-  const config = {
-    active: { color: 'bg-primary', ping: true, title: 'Active' },
-    pending: { color: 'bg-yellow-500', ping: true, title: 'DNS Propagating' },
-    not_ready: { color: 'bg-red-500', ping: false, title: 'Not Ready' },
-    checking: { color: 'bg-muted-foreground', ping: false, title: 'Checking...' },
-  };
-
-  const { color, ping, title } = config[status];
-
-  return (
-    <span className="relative flex h-2 w-2" title={title}>
-      {ping && (
-        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${color} opacity-75`} />
-      )}
-      <span className={`relative inline-flex rounded-full h-2 w-2 ${color}`} />
-    </span>
-  );
-}
-
-// Section 1: Your Facilitator - Has Facilitator State
-function FacilitatorHero({
-  facilitator,
-  onDnsSetupClick,
-}: {
-  facilitator: Facilitator;
-  onDnsSetupClick: () => void;
-}) {
-  const router = useRouter();
-  const { isActive, isPending, isNotConfigured, isLoading: isDomainLoading } = useDomainStatus(
-    facilitator.id,
-    !!facilitator.customDomain
-  );
-
-  const hasCustomDomain = !!facilitator.customDomain;
-  const isNotReady = hasCustomDomain && (isNotConfigured || isDomainLoading);
-
-  const getStatus = () => {
-    if (!hasCustomDomain) return 'not_ready';
-    if (isActive) return 'active';
-    if (isPending) return 'pending';
-    if (isNotReady) return 'not_ready';
-    return 'checking';
-  };
-
-  const displayDomain = facilitator.customDomain || facilitator.subdomain;
-  const displayUrl = facilitator.url;
-
-  // If DNS is not ready, show DNS dialog instead of navigating to manage page
-  const handleManageClick = () => {
-    if (isActive) {
-      router.push(`/dashboard/${facilitator.id}`);
-    } else {
-      onDnsSetupClick();
-    }
-  };
-
-  return (
-    <div className="text-center">
-      {/* Headline */}
-      <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
-        Your <span className="text-primary">x402</span> Facilitator
-      </h1>
-      <div className="flex items-center justify-center gap-2 mb-10">
-        <StatusIndicator status={getStatus()} />
-        <span className="text-muted-foreground">
-          {getStatus() === 'active' ? 'Active' : getStatus() === 'pending' ? 'DNS Propagating' : getStatus() === 'not_ready' ? 'Setup Required' : 'Checking'}
-        </span>
-      </div>
-
-      {/* Domain Display - The Hero */}
-      <div className="inline-block px-10 py-6 rounded-2xl bg-muted/40 border border-border/50 mb-8">
-        <p className="text-3xl sm:text-4xl font-mono font-semibold text-foreground">
-          {displayDomain}
-        </p>
-        <p className="text-sm text-muted-foreground mt-2 font-mono">
-          {displayUrl}
-        </p>
-      </div>
-
-      {/* Status Alerts */}
-      {isPending && (
-        <div className="flex items-center justify-center gap-2 mb-8 px-4 py-3 rounded-lg bg-yellow-500/10 text-yellow-600 dark:text-yellow-500 text-sm max-w-md mx-auto">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>DNS propagating - your domain may not work yet</span>
-        </div>
-      )}
-      {isNotReady && hasCustomDomain && (
-        <div className="flex items-center justify-center gap-2 mb-8 px-4 py-3 rounded-lg bg-red-500/10 text-red-600 dark:text-red-500 text-sm max-w-md mx-auto">
-          <AlertTriangle className="w-4 h-4 shrink-0" />
-          <span>DNS setup required - complete setup to activate</span>
-        </div>
-      )}
-      {!hasCustomDomain && (
-        <div className="flex items-center justify-center gap-2 mb-8 px-4 py-3 rounded-lg bg-muted/50 text-muted-foreground text-sm max-w-md mx-auto">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>No custom domain configured</span>
-        </div>
-      )}
-
-      {/* Stats Row */}
-      <div className="flex items-center justify-center gap-8 text-sm text-muted-foreground mb-10">
-        <div>
-          <span>Networks:</span>
-          <span className="ml-1 font-medium text-foreground">
-            {facilitator.supportedChains.length} chain{facilitator.supportedChains.length !== 1 ? 's' : ''}
-          </span>
-        </div>
-        <div>
-          <span>Created:</span>
-          <span className="ml-1 font-medium text-foreground">{formatDate(facilitator.createdAt)}</span>
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className="flex items-center justify-center gap-4">
-        <Button size="lg" onClick={handleManageClick}>
-          <Settings className="w-4 h-4 mr-2" />
-          {isActive ? 'Manage' : 'Complete Setup'}
-        </Button>
-        {isActive && (
-          <Button size="lg" variant="outline" asChild>
-            <a href={displayUrl} target="_blank" rel="noopener noreferrer">
-              View
-              <ExternalLink className="w-4 h-4 ml-2" />
-            </a>
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Section 1: Your Facilitator - Empty State
-function EmptyFacilitatorHero({ onCreateClick }: { onCreateClick: () => void }) {
-  return (
-    <div className="text-center">
-      {/* Headline */}
-      <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
-        Your <span className="text-primary">x402</span> Facilitator
-      </h1>
-      <p className="text-xl text-muted-foreground mb-10">
-        Your custom payment endpoint
-      </p>
-
-      {/* Domain Placeholder - The Feature */}
-      <div className="inline-block px-10 py-6 rounded-2xl bg-muted/40 border border-border/50 mb-10">
-        <p className="text-3xl sm:text-4xl font-mono font-semibold text-muted-foreground">
-          pay.yourdomain.com
-        </p>
-      </div>
-
-      {/* CTA */}
-      <div>
-        <Button size="lg" className="px-8" onClick={onCreateClick}>
-          <Plus className="w-5 h-5 mr-2" />
-          Create Facilitator
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// Section 2: Free Alternative
+// Free Endpoint Section
 function FreeEndpointSection() {
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
@@ -221,18 +50,14 @@ function FreeEndpointSection() {
   };
 
   return (
-    <div className="rounded-xl border-2 border-dashed border-border/60 bg-muted/10 p-6">
+    <div className="border-2 border-dashed border-border rounded-lg p-5">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex-1">
-          <p className="text-sm text-muted-foreground mb-1">Or just use ours</p>
-          <div className="flex items-center gap-3">
-            <code className="text-sm font-mono text-foreground">
-              {FREE_ENDPOINT}
-            </code>
-            <span className="text-xs text-muted-foreground">No setup needed</span>
-          </div>
+        <div>
+          <p className="text-muted-foreground mb-1">Don't need your own domain?</p>
+          <p className="font-mono">{FREE_ENDPOINT}</p>
+          <p className="text-sm text-muted-foreground">Just use ours · No setup needed</p>
         </div>
-        <Button variant="ghost" size="sm" onClick={handleCopy}>
+        <Button variant="outline" size="sm" onClick={handleCopy}>
           {copied ? (
             <>
               <Check className="w-4 h-4 mr-2" />
@@ -247,104 +72,6 @@ function FreeEndpointSection() {
         </Button>
       </div>
     </div>
-  );
-}
-
-// Section 3: Plan Card
-function PlanCard({
-  subscription,
-  isPurchasing,
-  onSubscribeClick
-}: {
-  subscription: { active: boolean; tier: string | null; expires: string | null } | undefined;
-  isPurchasing: boolean;
-  onSubscribeClick: () => void;
-}) {
-  return (
-    <Card className="border-border/60 bg-muted/10 shadow-none">
-      <CardContent className="pt-6">
-        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Current Plan</p>
-        <div className="flex items-center gap-2 mb-3">
-          {subscription?.active ? (
-            <>
-              <Sparkles className="w-5 h-5 text-primary" />
-              <span className="text-xl font-semibold">Starter</span>
-            </>
-          ) : (
-            <span className="text-xl font-semibold">Free</span>
-          )}
-        </div>
-
-        {subscription?.active ? (
-          <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              Expires {subscription.expires ? formatDate(subscription.expires) : 'N/A'}
-            </p>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onSubscribeClick}
-              disabled={isPurchasing}
-            >
-              {isPurchasing ? (
-                <>
-                  <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                  Renewing...
-                </>
-              ) : (
-                'Renew $5'
-              )}
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              Subscribe to create your own facilitator
-            </p>
-            <Button
-              size="sm"
-              onClick={onSubscribeClick}
-              disabled={isPurchasing}
-            >
-              {isPurchasing ? (
-                <>
-                  <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                'Subscribe $5/mo'
-              )}
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// Section 3: Wallet Card
-function WalletCard({ billingWallet }: { billingWallet: { hasWallet: boolean; balance: string } | undefined }) {
-  return (
-    <Card className="border-border/60 bg-muted/10 shadow-none">
-      <CardContent className="pt-6">
-        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Billing Wallet</p>
-        <p className="text-xl font-semibold mb-3">
-          ${billingWallet?.hasWallet ? billingWallet.balance : '0.00'}
-        </p>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Wallet className="w-3 h-3" />
-            <span>USDC on Solana</span>
-          </div>
-          <Link
-            href="/dashboard/account"
-            className="text-xs text-primary hover:underline"
-          >
-            Manage
-          </Link>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -372,7 +99,6 @@ function DnsSetupDialog({
   const domain = facilitator?.customDomain || '';
   const subdomain = domain.split('.')[0] || 'x402';
 
-  // Fetch domain status to get dynamic DNS records
   const { cnameValue, cnameName: apiCnameName, cnameType } = useDomainStatus(
     facilitator?.id,
     !!facilitator?.customDomain && open
@@ -426,21 +152,16 @@ function DnsSetupDialog({
     mutationFn: async (newDomain: string) => {
       if (!facilitator) throw new Error('No facilitator');
 
-      // 1. Remove old domain from Railway if one exists
       if (facilitator.customDomain) {
         try {
           await api.removeDomain(facilitator.id);
         } catch {
-          // Continue even if removal fails - domain might not be set up yet
+          // Continue even if removal fails
         }
       }
 
-      // 2. Update facilitator with new domain
       const updated = await api.updateFacilitator(facilitator.id, { customDomain: newDomain });
-
-      // 3. Set up new domain on Railway
       await api.setupDomain(facilitator.id);
-
       return updated;
     },
     onSuccess: (updatedFacilitator) => {
@@ -453,7 +174,7 @@ function DnsSetupDialog({
     onError: (error) => {
       toast({
         title: 'Update failed',
-        description: error instanceof Error ? error.message : 'Could not update domain. Please try again.',
+        description: error instanceof Error ? error.message : 'Could not update domain.',
         variant: 'destructive',
       });
     },
@@ -488,7 +209,6 @@ function DnsSetupDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Domain - Inline Editable */}
         <div className="flex items-center gap-2 py-4">
           {isEditing ? (
             <>
@@ -519,7 +239,6 @@ function DnsSetupDialog({
           )}
         </div>
 
-        {/* DNS Record Box */}
         <div className="rounded-xl border border-border bg-muted/30 p-5 space-y-4">
           <div className="grid grid-cols-[80px_1fr] gap-2 text-sm">
             <span className="text-muted-foreground">Type:</span>
@@ -583,118 +302,15 @@ function DnsSetupDialog({
   );
 }
 
-// Create Facilitator Dialog
-function CreateFacilitatorDialog({
-  open,
-  onOpenChange,
-  onSuccess
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSuccess: (facilitator: Facilitator) => void;
-}) {
-  const [newFacilitator, setNewFacilitator] = useState({
-    name: '',
-    customDomain: '',
-  });
-
-  const createMutation = useMutation({
-    mutationFn: async (data: { name: string; customDomain: string }) => {
-      // 1. Create the facilitator
-      const facilitator = await api.createFacilitator({
-        ...data,
-        subdomain: data.customDomain.replace(/\./g, '-'),
-      });
-
-      // 2. Set up the domain on Railway
-      await api.setupDomain(facilitator.id);
-
-      return facilitator;
-    },
-    onSuccess: (facilitator) => {
-      onSuccess(facilitator);
-      onOpenChange(false);
-      setNewFacilitator({ name: '', customDomain: '' });
-    },
-  });
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Create Facilitator</DialogTitle>
-          <DialogDescription>
-            Set up your x402 payment facilitator with your own domain.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              placeholder="My Facilitator"
-              value={newFacilitator.name}
-              onChange={(e) =>
-                setNewFacilitator((prev) => ({ ...prev, name: e.target.value }))
-              }
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="customDomain">Your Domain</Label>
-            <Input
-              id="customDomain"
-              placeholder="pay.yourdomain.com"
-              value={newFacilitator.customDomain}
-              onChange={(e) =>
-                setNewFacilitator((prev) => ({
-                  ...prev,
-                  customDomain: e.target.value.toLowerCase().replace(/[^a-z0-9.-]/g, ''),
-                }))
-              }
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button
-            onClick={() => {
-              createMutation.mutate({
-                name: newFacilitator.name,
-                customDomain: newFacilitator.customDomain,
-              });
-            }}
-            disabled={
-              !newFacilitator.name ||
-              !newFacilitator.customDomain ||
-              createMutation.isPending
-            }
-          >
-            {createMutation.isPending ? 'Creating...' : 'Create'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export default function DashboardPage() {
   const router = useRouter();
   const { isLoading: authLoading, isAuthenticated } = useAuth();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isPurchasing, setIsPurchasing] = useState(false);
-  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
-  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
-  const [successTxHash, setSuccessTxHash] = useState<string | undefined>();
   const [dnsSetupOpen, setDnsSetupOpen] = useState(false);
   const [dnsSetupFacilitator, setDnsSetupFacilitator] = useState<Facilitator | null>(null);
 
-  // Redirect to signin if not authenticated
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.push('/auth/signin');
@@ -719,56 +335,8 @@ export default function DashboardPage() {
     enabled: isAuthenticated,
   });
 
-  const purchaseMutation = useMutation({
-    mutationFn: () => api.purchaseSubscription(),
-    onSuccess: (result) => {
-      if (result.success) {
-        setSuccessTxHash(result.txHash);
-        setSuccessDialogOpen(true);
-        queryClient.invalidateQueries({ queryKey: ['subscription'] });
-        queryClient.invalidateQueries({ queryKey: ['billingWallet'] });
-      } else if (result.insufficientBalance) {
-        toast({
-          title: 'Insufficient balance',
-          description: `You need $${result.required} USDC but only have $${result.available}. Fund your billing wallet first.`,
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: 'Purchase failed',
-          description: result.error || 'Something went wrong',
-          variant: 'destructive',
-        });
-      }
-      setIsPurchasing(false);
-    },
-    onError: (error) => {
-      toast({
-        title: 'Purchase failed',
-        description: error instanceof Error ? error.message : 'Something went wrong',
-        variant: 'destructive',
-      });
-      setIsPurchasing(false);
-    },
-  });
-
-  const handleSubscribeClick = () => {
-    setConfirmDialogOpen(true);
-  };
-
-  const handleConfirmPurchase = () => {
-    setIsPurchasing(true);
-    purchaseMutation.mutate();
-  };
-
   const handleCreateSuccess = (facilitator: Facilitator) => {
     queryClient.invalidateQueries({ queryKey: ['facilitators'] });
-    // Show DNS setup dialog immediately after creation
-    setDnsSetupFacilitator(facilitator);
-    setDnsSetupOpen(true);
-  };
-
-  const handleDnsSetupClick = (facilitator: Facilitator) => {
     setDnsSetupFacilitator(facilitator);
     setDnsSetupOpen(true);
   };
@@ -779,7 +347,6 @@ export default function DashboardPage() {
     }
   };
 
-  // Show loading while checking auth
   if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -792,87 +359,74 @@ export default function DashboardPage() {
     return null;
   }
 
-  const hasFacilitator = facilitators && facilitators.length > 0;
-  const canCreateFacilitator = subscription?.active;
+  const hasFacilitators = facilitators && facilitators.length > 0;
+  const walletBalance = billingWallet?.hasWallet ? billingWallet.balance : '0.00';
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="max-w-4xl mx-auto px-6 pt-32 pb-20">
-        {/* Section 1: Your Facilitator (Primary CTA) - Hero, no card */}
-        <section className="mb-16">
-          {isLoading ? (
-            <div className="text-center animate-pulse">
-              <div className="h-12 bg-muted rounded w-64 mx-auto mb-4" />
-              <div className="h-6 bg-muted rounded w-48 mx-auto mb-10" />
-              <div className="h-24 bg-muted rounded-2xl w-80 mx-auto mb-10" />
-              <div className="h-12 bg-muted rounded w-48 mx-auto" />
-            </div>
-          ) : hasFacilitator ? (
-            <FacilitatorHero
-              facilitator={facilitators[0]}
-              onDnsSetupClick={() => handleDnsSetupClick(facilitators[0])}
-            />
-          ) : canCreateFacilitator ? (
-            <EmptyFacilitatorHero onCreateClick={() => setIsCreateOpen(true)} />
-          ) : (
-            // User not subscribed - show subscription prompt (no card, just content)
-            <div className="text-center">
-              {/* Headline */}
-              <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
-                Your <span className="text-primary">x402</span> Facilitator
-              </h1>
-              <p className="text-xl text-muted-foreground mb-10">
-                Your custom payment endpoint
+      <main className="max-w-7xl mx-auto px-6 pt-24 pb-20">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold">Your Facilitators</h1>
+            {hasFacilitators && (
+              <p className="text-muted-foreground mt-1">
+                {facilitators.length} facilitator{facilitators.length !== 1 ? 's' : ''} · ${facilitators.length * 5}/month
               </p>
-
-              {/* Domain Placeholder - The Feature */}
-              <div className="inline-block px-10 py-6 rounded-2xl bg-muted/40 border border-border/50 mb-8">
-                <p className="text-3xl sm:text-4xl font-mono font-semibold text-muted-foreground">
-                  pay.yourdomain.com
-                </p>
-              </div>
-
-              {/* Subscribe prompt */}
-              <p className="text-muted-foreground mb-10">
-                Subscribe to the Starter plan to create your own facilitator
-              </p>
-
-              {/* CTA */}
-              <div>
-                <Button size="lg" className="px-8" onClick={handleSubscribeClick} disabled={isPurchasing}>
-                  {isPurchasing ? (
-                    <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-5 h-5 mr-2" />
-                      Subscribe $5/mo
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
+            )}
+          </div>
+          {hasFacilitators && (
+            <Button onClick={() => setIsCreateOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              New Facilitator
+            </Button>
           )}
-        </section>
+        </div>
 
-        {/* Section 2: Free Alternative (Secondary) */}
-        <section className="mb-12">
+        {/* Loading State */}
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="border border-border rounded-lg p-5 animate-pulse">
+                <div className="h-5 bg-muted rounded w-3/4 mb-2" />
+                <div className="h-4 bg-muted rounded w-1/2 mb-4" />
+                <div className="h-4 bg-muted rounded w-2/3 mb-4" />
+                <div className="h-8 bg-muted rounded w-1/3 mt-4" />
+              </div>
+            ))}
+          </div>
+        ) : hasFacilitators ? (
+          /* Facilitator Grid */
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+            {facilitators.map((facilitator) => (
+              <FacilitatorCard key={facilitator.id} facilitator={facilitator} />
+            ))}
+            <CreateFacilitatorCard onClick={() => setIsCreateOpen(true)} />
+          </div>
+        ) : (
+          /* Empty State */
+          <div className="mb-12">
+            <EmptyState onCreateClick={() => setIsCreateOpen(true)} />
+          </div>
+        )}
+
+        {/* Shared Facilitator Option */}
+        <div className="mb-12">
           <FreeEndpointSection />
-        </section>
+        </div>
 
-        {/* Section 3: Account Context (Footer-level) */}
-        <section className="grid sm:grid-cols-2 gap-4 mb-10">
-          <PlanCard
-            subscription={subscription}
-            isPurchasing={isPurchasing}
-            onSubscribeClick={handleSubscribeClick}
-          />
-          <WalletCard billingWallet={billingWallet} />
-        </section>
+        {/* Billing Section (only show if has facilitators) */}
+        {hasFacilitators && (
+          <div className="mb-12">
+            <BillingSection
+              facilitators={facilitators}
+              walletBalance={walletBalance}
+              subscription={subscription}
+            />
+          </div>
+        )}
 
         {/* Docs Link */}
         <div className="text-center">
@@ -885,29 +439,12 @@ export default function DashboardPage() {
         </div>
       </main>
 
-      {/* Create Facilitator Dialog */}
-      <CreateFacilitatorDialog
+      {/* Create Facilitator Modal */}
+      <CreateFacilitatorModal
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
         onSuccess={handleCreateSuccess}
-      />
-
-      {/* Subscription Confirmation Dialog */}
-      <SubscriptionConfirmDialog
-        open={confirmDialogOpen}
-        onOpenChange={setConfirmDialogOpen}
-        tier="starter"
-        balance={billingWallet?.balance ?? null}
-        isPurchasing={isPurchasing}
-        onConfirm={handleConfirmPurchase}
-      />
-
-      {/* Subscription Success Dialog */}
-      <SubscriptionSuccessDialog
-        open={successDialogOpen}
-        onOpenChange={setSuccessDialogOpen}
-        tier="starter"
-        txHash={successTxHash}
+        walletBalance={walletBalance}
       />
 
       {/* DNS Setup Dialog */}
