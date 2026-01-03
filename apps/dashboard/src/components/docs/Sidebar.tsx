@@ -35,42 +35,40 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <nav className="py-6 pr-6">
-      <div className="space-y-1">
-        {navigation.map((item) => (
-          <div key={item.href} className="mb-1">
-            <Link
-              href={item.href}
-              className={cn(
-                'block px-3 py-2 rounded-md text-sm transition-colors',
-                pathname === item.href
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              )}
-            >
-              {item.title}
-            </Link>
-            {item.children && (
-              <div className="ml-4 mt-1 space-y-1 border-l border-border pl-3">
-                {item.children.map((child) => (
-                  <Link
-                    key={child.href}
-                    href={child.href}
-                    className={cn(
-                      'block px-3 py-1.5 rounded-md text-sm transition-colors',
-                      pathname === child.href
-                        ? 'text-primary font-medium'
-                        : 'text-muted-foreground hover:text-foreground'
-                    )}
-                  >
-                    {child.title}
-                  </Link>
-                ))}
-              </div>
+    <div className="space-y-1">
+      {navigation.map((item) => (
+        <div key={item.href} className="mb-1">
+          <Link
+            href={item.href}
+            className={cn(
+              'block px-3 py-2 rounded-md text-sm transition-colors',
+              pathname === item.href
+                ? 'bg-primary/10 text-primary font-medium'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
             )}
-          </div>
-        ))}
-      </div>
-    </nav>
+          >
+            {item.title}
+          </Link>
+          {item.children && (
+            <div className="ml-4 mt-1 space-y-1 border-l border-border pl-3">
+              {item.children.map((child) => (
+                <Link
+                  key={child.href}
+                  href={child.href}
+                  className={cn(
+                    'block px-3 py-1.5 rounded-md text-sm transition-colors',
+                    pathname === child.href
+                      ? 'text-primary font-medium'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  {child.title}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }

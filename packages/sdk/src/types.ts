@@ -1,8 +1,8 @@
 // ============ Configuration ============
 
 export interface FacilitatorConfig {
-  /** Facilitator URL (e.g., https://pay.honeypot.game) */
-  url: string;
+  /** Facilitator URL (defaults to https://pay.openfacilitator.io) */
+  url?: string;
   /** Optional timeout in ms (default: 30000) */
   timeout?: number;
   /** Optional custom headers */

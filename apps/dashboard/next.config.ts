@@ -1,6 +1,7 @@
 import type { NextConfig } from 'next';
 import createMDX from '@next/mdx';
 import rehypePrettyCode from 'rehype-pretty-code';
+import remarkGfm from 'remark-gfm';
 
 const nextConfig: NextConfig = {
   transpilePackages: ['@openfacilitator/core'],
@@ -9,12 +10,13 @@ const nextConfig: NextConfig = {
 
 const withMDX = createMDX({
   options: {
+    remarkPlugins: [remarkGfm],
     rehypePlugins: [
       [
         rehypePrettyCode,
         {
           theme: 'github-dark',
-          keepBackground: true,
+          keepBackground: false,
         },
       ],
     ],

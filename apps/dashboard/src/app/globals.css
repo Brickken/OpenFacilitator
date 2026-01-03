@@ -123,3 +123,19 @@
   background-size: 100% 40%;
   background-position: 0 90%;
 }
+
+/* ========================================
+   Code Block Styling
+   ======================================== */
+
+/* Force code blocks to always use dark background */
+pre,
+figure[data-rehype-pretty-code-figure] pre {
+  background-color: #0d1117 !important;
+  border: 1px solid hsl(var(--border));
+}
+
+/* Ensure figure wrapper doesn't add unwanted margins */
+figure[data-rehype-pretty-code-figure] {
+  margin: 0;
+}

@@ -11,23 +11,19 @@ import {
   NetworkError,
   VerificationError,
   SettlementError,
-  ConfigurationError,
 } from './errors.js';
 import { buildUrl, normalizeUrl } from './utils.js';
 
 const DEFAULT_TIMEOUT = 30000;
+const DEFAULT_URL = 'https://pay.openfacilitator.io';
 
 export class OpenFacilitator {
   private readonly baseUrl: string;
   private readonly timeout: number;
   private readonly headers: Record<string, string>;
 
-  constructor(config: FacilitatorConfig) {
-    if (!config.url) {
-      throw new ConfigurationError('Facilitator URL is required');
-    }
-
-    this.baseUrl = normalizeUrl(config.url);
+  constructor(config: FacilitatorConfig = {}) {
+    this.baseUrl = normalizeUrl(config.url ?? DEFAULT_URL);
     this.timeout = config.timeout ?? DEFAULT_TIMEOUT;
     this.headers = {
       'Content-Type': 'application/json',
@@ -188,9 +184,8 @@ export class OpenFacilitator {
 
 /**
  * Create a facilitator client with default OpenFacilitator URL
+ * @deprecated Just use `new OpenFacilitator()` - it defaults to the public endpoint
  */
 export function createDefaultFacilitator(): OpenFacilitator {
-  return new OpenFacilitator({
-    url: 'https://pay.openfacilitator.io',
-  });
+  return new OpenFacilitator();
 }

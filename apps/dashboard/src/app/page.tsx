@@ -176,7 +176,7 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-2">
             <Globe className="w-5 h-5 text-primary" />
-            <span className="font-medium">Base + Solana</span>
+            <span className="font-medium">EVM + Solana</span>
           </div>
           <div className="flex items-center gap-2">
             <Github className="w-5 h-5 text-primary" />
@@ -196,20 +196,12 @@ export default function Home() {
             Or just use ours
           </h2>
           <p className="text-muted-foreground text-center mb-12 max-w-xl mx-auto">
-            Completely free. One line of code. Start accepting payments in seconds.
+            Completely free. Start accepting payments in seconds.
           </p>
 
-          <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 p-6">
-            <div className="flex items-center gap-4 p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 font-mono text-lg break-all mb-4">
-              <span className="text-gray-900 dark:text-gray-100 flex-1">{FREE_ENDPOINT}</span>
-              <CopyButton text={FREE_ENDPOINT} />
-            </div>
-
-            <div className="flex items-center justify-center gap-8 text-xs text-gray-500 dark:text-gray-400">
-              <span>Base</span>
-              <span>Solana</span>
-              <span>USDC</span>
-            </div>
+          <div className="flex items-center gap-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 font-mono text-lg break-all">
+            <span className="text-gray-900 dark:text-gray-100 flex-1">{FREE_ENDPOINT}</span>
+            <CopyButton text={FREE_ENDPOINT} />
           </div>
 
           {/* Quick code example */}
@@ -222,13 +214,42 @@ export default function Home() {
               </div>
               <span className="text-xs text-muted-foreground ml-2">example.ts</span>
             </div>
-            <pre className="p-4 text-sm overflow-x-auto">
-              <code className="text-[#c9d1d9]">
-{`import { createPaymentHandler } from '@x402/facilitator';
-
-const handler = createPaymentHandler({
-  facilitatorUrl: '${FREE_ENDPOINT}'
-});`}
+            <pre className="p-4 text-sm overflow-x-auto font-mono leading-relaxed">
+              <code>
+                <span className="text-[#ff7b72]">import</span>
+                <span className="text-[#c9d1d9]">{" { "}</span>
+                <span className="text-[#ffa657]">OpenFacilitator</span>
+                <span className="text-[#c9d1d9]">{" } "}</span>
+                <span className="text-[#ff7b72]">from</span>
+                <span className="text-[#a5d6ff]">{" '@openfacilitator/sdk'"}</span>
+                <span className="text-[#c9d1d9]">;</span>
+                {"\n\n"}
+                <span className="text-[#ff7b72]">const</span>
+                <span className="text-[#c9d1d9]"> facilitator = </span>
+                <span className="text-[#ff7b72]">new</span>
+                <span className="text-[#ffa657]"> OpenFacilitator</span>
+                <span className="text-[#c9d1d9]">();</span>
+                {"\n\n"}
+                <span className="text-[#ff7b72]">const</span>
+                <span className="text-[#c9d1d9]">{" requirements = { scheme, network, maxAmountRequired, asset, payTo };"}</span>
+                {"\n\n"}
+                <span className="text-[#ff7b72]">const</span>
+                <span className="text-[#c9d1d9]">{" { "}</span>
+                <span className="text-[#c9d1d9]">valid</span>
+                <span className="text-[#c9d1d9]">{" } = "}</span>
+                <span className="text-[#ff7b72]">await</span>
+                <span className="text-[#c9d1d9]"> facilitator.</span>
+                <span className="text-[#d2a8ff]">verify</span>
+                <span className="text-[#c9d1d9]">(payment, requirements);</span>
+                {"\n"}
+                <span className="text-[#ff7b72]">const</span>
+                <span className="text-[#c9d1d9]">{" { "}</span>
+                <span className="text-[#c9d1d9]">transactionHash</span>
+                <span className="text-[#c9d1d9]">{" } = "}</span>
+                <span className="text-[#ff7b72]">await</span>
+                <span className="text-[#c9d1d9]"> facilitator.</span>
+                <span className="text-[#d2a8ff]">settle</span>
+                <span className="text-[#c9d1d9]">(payment, requirements);</span>
               </code>
             </pre>
           </div>
@@ -322,7 +343,7 @@ const handler = createPaymentHandler({
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-primary" />
-                  Base + Solana mainnet
+                  EVM + Solana mainnet
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-primary" />

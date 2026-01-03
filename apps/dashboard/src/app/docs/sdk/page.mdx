@@ -11,9 +11,8 @@ npm install @openfacilitator/sdk
 ```typescript
 import { OpenFacilitator } from '@openfacilitator/sdk';
 
-const facilitator = new OpenFacilitator({
-  url: 'https://pay.openfacilitator.io',
-});
+// Uses https://pay.openfacilitator.io by default
+const facilitator = new OpenFacilitator();
 
 // Verify payment
 const verification = await facilitator.verify(payment, requirements);
@@ -28,7 +27,7 @@ const supported = await facilitator.supported();
 ## API Reference
 
 | Method | Description |
-|--------|-------------|
+| ------ | ----------- |
 | [`verify()`](/docs/sdk/verify) | Verify a payment is valid |
 | [`settle()`](/docs/sdk/settle) | Settle/broadcast a payment |
 | [`supported()`](/docs/sdk/supported) | Get supported networks |
@@ -36,7 +35,7 @@ const supported = await facilitator.supported();
 ## Utilities
 
 | Function | Description |
-|----------|-------------|
+| -------- | ----------- |
 | [`getNetwork()`](/docs/sdk/networks) | Get network info by ID |
 | [`toV2NetworkId()`](/docs/sdk/networks) | Convert v1 to v2 network ID |
 | [`toV1NetworkId()`](/docs/sdk/networks) | Convert v2 to v1 network ID |

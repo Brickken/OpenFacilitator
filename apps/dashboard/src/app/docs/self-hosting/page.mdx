@@ -33,7 +33,7 @@ docker-compose up -d
 ## Environment Variables
 
 | Variable | Description | Required |
-|----------|-------------|----------|
+| -------- | ----------- | -------- |
 | `DATABASE_URL` | PostgreSQL connection string | Yes |
 | `EVM_PRIVATE_KEY` | EVM wallet private key | For EVM networks |
 | `SOLANA_PRIVATE_KEY` | Solana wallet private key | For Solana |
@@ -70,7 +70,7 @@ docker run -d -p 3000:3000 --env-file .env openfacilitator/server:latest
 After deploying, add a CNAME record pointing to your deployment:
 
 | Type | Name | Value |
-|------|------|-------|
+| ---- | ---- | ----- |
 | CNAME | `pay` | `your-deployment.railway.app` |
 
 See [DNS Setup](/docs/dns-setup) for detailed instructions.

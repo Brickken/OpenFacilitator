@@ -13,7 +13,7 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
     ),
 
     h2: ({ children }) => (
-      <h2 className="text-xl font-semibold mt-12 mb-4 text-foreground first:mt-0">{children}</h2>
+      <h2 className="text-xl font-semibold mt-10 mb-4 text-foreground first:mt-0">{children}</h2>
     ),
 
     h3: ({ children }) => (
@@ -34,16 +34,20 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
       </pre>
     ),
 
-    code: ({ children, className }) => {
-      // Inline code (no className) vs code block (has className)
-      if (!className) {
+    code: ({ children, className, ...props }) => {
+      // Code blocks from rehype-pretty-code have data-* attributes or are inside <pre>
+      // Inline code has no className and no data attributes
+      const isCodeBlock = className || (props as Record<string, unknown>)['data-language'];
+      
+      if (!isCodeBlock) {
         return (
           <code className="px-1.5 py-0.5 bg-muted rounded text-sm font-mono">
             {children}
           </code>
         );
       }
-      return <code className={className}>{children}</code>;
+      // For code blocks, pass through without adding bg-muted
+      return <code className={className} {...props}>{children}</code>;
     },
 
     ul: ({ children }) => (
@@ -90,6 +94,14 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
       <thead className="border-b border-border">{children}</thead>
     ),
 
+    tbody: ({ children }) => (
+      <tbody className="divide-y divide-border">{children}</tbody>
+    ),
+
+    tr: ({ children }) => (
+      <tr>{children}</tr>
+    ),
+
     th: ({ children }) => (
       <th className="text-left py-3 px-3 font-semibold text-foreground">
         {children}
@@ -97,7 +109,7 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
     ),
 
     td: ({ children }) => (
-      <td className="py-3 px-3 border-b border-border text-muted-foreground">
+      <td className="py-3 px-3 text-muted-foreground">
         {children}
       </td>
     ),

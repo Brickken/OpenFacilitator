@@ -11,10 +11,8 @@ npm install @openfacilitator/sdk
 ```typescript
 import { OpenFacilitator } from '@openfacilitator/sdk';
 
-// Use the default shared facilitator
-const facilitator = new OpenFacilitator({
-  url: 'https://pay.openfacilitator.io',
-});
+// Uses https://pay.openfacilitator.io by default
+const facilitator = new OpenFacilitator();
 
 // Or use your own
 const myFacilitator = new OpenFacilitator({

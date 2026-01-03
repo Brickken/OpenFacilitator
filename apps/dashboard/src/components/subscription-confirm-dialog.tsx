@@ -23,7 +23,7 @@ const PRICE = 5; // $5/month for starter tier
 
 const BENEFITS = [
   'Your own custom domain (pay.yourdomain.com)',
-  'Base + Solana support',
+  'EVM + Solana support',
   'USDC payments',
   'Dashboard & analytics',
 ];

@@ -239,171 +239,22 @@ function DnsSetupDialog({
           )}
         </div>
 
-        <div className="rounded-xl border border-border bg-muted/30 p-5 space-y-4">
-          <div className="grid grid-cols-[80px_1fr] gap-2 text-sm">
-            <span className="text-muted-foreground">Type:</span>
-            <span className="font-mono font-medium">{cnameType}</span>
-          </div>
-          <div className="grid grid-cols-[80px_1fr] gap-2 text-sm">
-            <span className="text-muted-foreground">Name:</span>
-            <span className="font-mono font-medium">{cnameName}</span>
-          </div>
-          <div className="grid grid-cols-[80px_1fr] gap-2 text-sm">
-            <span className="text-muted-foreground">Value:</span>
-            <div className="flex items-center gap-2">
-              <span className="font-mono font-medium truncate">{cnameValue}</span>
-              <button
-                onClick={handleCopy}
-                className="p-1 hover:bg-muted rounded transition-colors shrink-0"
-                title="Copy value"
-              >
-                {copied ? (
-                  <Check className="w-4 h-4 text-primary" />
-                ) : (
-                  <Copy className="w-4 h-4 text-muted-foreground" />
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-4 pt-4">
-          <Button
-            className="w-full"
-            size="lg"
-            onClick={handleCheckDns}
-            disabled={isChecking}
-          >
-            {isChecking ? (
-              <>
-                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                Checking...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Check DNS Status
-              </>
-            )}
-          </Button>
-
-          <div className="text-center">
-            <Link
-              href="/docs/dns-setup"
-              className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <HelpCircle className="w-4 h-4" />
-              Need help? View DNS setup guide
-            </Link>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// Subdomain Setup Dialog - shown when trying to access a facilitator with inactive subdomain
-function SubdomainSetupDialog({
-  open,
-  onOpenChange,
-  facilitator,
-  onDnsVerified,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  facilitator: Facilitator | null;
-  onDnsVerified?: () => void;
-}) {
-  const [copied, setCopied] = useState(false);
-  const [isChecking, setIsChecking] = useState(false);
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  const subdomainFull = facilitator ? `${facilitator.subdomain}.openfacilitator.io` : '';
-
-  const { data: subdomainStatus, refetch } = useQuery({
-    queryKey: ['subdomainStatus', facilitator?.id],
-    queryFn: () => api.getSubdomainStatus(facilitator!.id),
-    enabled: !!facilitator && open,
-  });
-
-  const handleCopy = async (value: string) => {
-    await navigator.clipboard.writeText(value);
-    setCopied(true);
-    toast({ title: 'Copied!', description: 'Value copied to clipboard' });
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleCheckDns = async () => {
-    if (!facilitator) return;
-
-    setIsChecking(true);
-    try {
-      const status = await api.getSubdomainStatus(facilitator.id);
-      queryClient.invalidateQueries({ queryKey: ['subdomainStatus', facilitator.id] });
-      refetch();
-
-      if (status.status === 'active') {
-        toast({ title: 'DNS Verified!', description: 'Your subdomain is now active.' });
-        onOpenChange(false);
-        onDnsVerified?.();
-      } else if (status.status === 'pending') {
-        toast({
-          title: 'DNS Propagating',
-          description: 'Your DNS is configured but still propagating. This can take up to 48 hours.',
-        });
-      } else {
-        toast({
-          title: 'DNS Not Configured',
-          description: 'Please add the CNAME record and try again.',
-          variant: 'destructive',
-        });
-      }
-    } catch {
-      toast({
-        title: 'Check Failed',
-        description: 'Could not verify DNS status. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsChecking(false);
-    }
-  };
-
-  const dnsRecord = subdomainStatus?.dnsRecords?.[0];
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-2xl">Almost there!</DialogTitle>
-          <DialogDescription className="text-base">
-            Add this DNS record to activate your domain
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="flex items-center gap-2 py-4">
-          <div className="flex-1 px-3 py-2 rounded-md bg-muted font-mono text-sm">
-            {subdomainFull}
-          </div>
-        </div>
-
-        {dnsRecord ? (
+        {cnameValue ? (
           <div className="rounded-xl border border-border bg-muted/30 p-5 space-y-4">
             <div className="grid grid-cols-[80px_1fr] gap-2 text-sm">
               <span className="text-muted-foreground">Type:</span>
-              <span className="font-mono font-medium">{dnsRecord.type}</span>
+              <span className="font-mono font-medium">{cnameType}</span>
             </div>
             <div className="grid grid-cols-[80px_1fr] gap-2 text-sm">
               <span className="text-muted-foreground">Name:</span>
-              <span className="font-mono font-medium">{dnsRecord.name?.split('.')[0] || facilitator?.subdomain}</span>
+              <span className="font-mono font-medium">{cnameName || '@'}</span>
             </div>
             <div className="grid grid-cols-[80px_1fr] gap-2 text-sm">
               <span className="text-muted-foreground">Value:</span>
               <div className="flex items-center gap-2">
-                <span className="font-mono font-medium truncate">{dnsRecord.value}</span>
+                <span className="font-mono font-medium truncate">{cnameValue}</span>
                 <button
-                  onClick={() => handleCopy(dnsRecord.value)}
+                  onClick={handleCopy}
                   className="p-1 hover:bg-muted rounded transition-colors shrink-0"
                   title="Copy value"
                 >
@@ -419,7 +270,7 @@ function SubdomainSetupDialog({
         ) : (
           <div className="rounded-xl border border-border bg-muted/30 p-5">
             <p className="text-sm text-muted-foreground">
-              {subdomainStatus?.message || 'Loading DNS configuration...'}
+              Loading DNS configuration from Railway...
             </p>
           </div>
         )}
@@ -467,9 +318,7 @@ export default function DashboardPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [dnsSetupOpen, setDnsSetupOpen] = useState(false);
   const [dnsSetupFacilitator, setDnsSetupFacilitator] = useState<Facilitator | null>(null);
-  const [subdomainSetupOpen, setSubdomainSetupOpen] = useState(false);
-  const [subdomainSetupFacilitator, setSubdomainSetupFacilitator] = useState<Facilitator | null>(null);
-  const [isCheckingSubdomain, setIsCheckingSubdomain] = useState(false);
+  const [isCheckingDomain, setIsCheckingDomain] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -508,29 +357,29 @@ export default function DashboardPage() {
   };
 
   const handleManageClick = async (facilitator: Facilitator) => {
-    setIsCheckingSubdomain(true);
+    // If no custom domain, just go to dashboard (shouldn't happen with current flow)
+    if (!facilitator.customDomain) {
+      router.push(`/dashboard/${facilitator.id}`);
+      return;
+    }
+
+    setIsCheckingDomain(true);
     try {
-      const status = await api.getSubdomainStatus(facilitator.id);
+      const status = await api.getDomainStatus(facilitator.id);
       if (status.status === 'active') {
-        // Subdomain is active, navigate to dashboard
+        // Domain is verified, navigate to dashboard
         router.push(`/dashboard/${facilitator.id}`);
       } else {
-        // Show subdomain setup dialog
-        setSubdomainSetupFacilitator(facilitator);
-        setSubdomainSetupOpen(true);
+        // Domain not verified yet, show DNS setup dialog
+        setDnsSetupFacilitator(facilitator);
+        setDnsSetupOpen(true);
       }
     } catch {
-      // On error, show dialog anyway
-      setSubdomainSetupFacilitator(facilitator);
-      setSubdomainSetupOpen(true);
+      // On error, show DNS setup dialog
+      setDnsSetupFacilitator(facilitator);
+      setDnsSetupOpen(true);
     } finally {
-      setIsCheckingSubdomain(false);
-    }
-  };
-
-  const handleSubdomainVerified = () => {
-    if (subdomainSetupFacilitator) {
-      router.push(`/dashboard/${subdomainSetupFacilitator.id}`);
+      setIsCheckingDomain(false);
     }
   };
 
@@ -638,7 +487,7 @@ export default function DashboardPage() {
         walletBalance={walletBalance}
       />
 
-      {/* DNS Setup Dialog (for custom domains after creation) */}
+      {/* DNS Setup Dialog */}
       <DnsSetupDialog
         open={dnsSetupOpen}
         onOpenChange={setDnsSetupOpen}
@@ -647,16 +496,8 @@ export default function DashboardPage() {
         onFacilitatorUpdated={setDnsSetupFacilitator}
       />
 
-      {/* Subdomain Setup Dialog (shown when clicking Manage on inactive subdomain) */}
-      <SubdomainSetupDialog
-        open={subdomainSetupOpen}
-        onOpenChange={setSubdomainSetupOpen}
-        facilitator={subdomainSetupFacilitator}
-        onDnsVerified={handleSubdomainVerified}
-      />
-
-      {/* Loading overlay when checking subdomain */}
-      {isCheckingSubdomain && (
+      {/* Loading overlay when checking domain status */}
+      {isCheckingDomain && (
         <div className="fixed inset-0 bg-background/50 flex items-center justify-center z-50">
           <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
         </div>

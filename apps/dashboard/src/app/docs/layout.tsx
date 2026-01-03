@@ -11,16 +11,16 @@ export default function DocsLayout({
       <Navbar />
       <div className="max-w-7xl mx-auto px-6 pt-20">
         <div className="flex">
-          {/* Sidebar */}
-          <aside className="w-64 shrink-0">
-            <div className="sticky top-24">
+          {/* Sidebar - fixed width, sticky */}
+          <aside className="w-64 shrink-0 border-r border-border">
+            <div className="sticky top-20 pr-6">
               <Sidebar />
             </div>
           </aside>
 
-          {/* Content */}
-          <main className="flex-1 flex justify-center min-w-0">
-            <article className="w-full max-w-3xl px-8 py-12">
+          {/* Content - left aligned, max-width constrained */}
+          <main className="flex-1 min-w-0">
+            <article className="max-w-3xl pl-12 pr-8 pt-6 pb-24">
               {children}
             </article>
           </main>
