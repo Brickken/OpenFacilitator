@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDate } from '@/lib/utils';
@@ -12,6 +11,7 @@ interface FacilitatorCardProps {
     networksConfigured: number;
     totalSettled: number;
   };
+  onManageClick?: () => void;
 }
 
 function StatusBadge({ status }: { status: 'active' | 'pending' | 'expired' }) {
@@ -51,7 +51,7 @@ function formatNumber(num: number): string {
   return num.toFixed(2);
 }
 
-export function FacilitatorCard({ facilitator, stats }: FacilitatorCardProps) {
+export function FacilitatorCard({ facilitator, stats, onManageClick }: FacilitatorCardProps) {
   const domain = facilitator.customDomain || facilitator.subdomain;
   const url = facilitator.url;
 
@@ -97,11 +97,9 @@ export function FacilitatorCard({ facilitator, stats }: FacilitatorCardProps) {
         <span className="text-xs text-muted-foreground">
           Created {formatDate(facilitator.createdAt)}
         </span>
-        <Link href={`/dashboard/${facilitator.id}`}>
-          <Button variant="outline" size="sm">
-            Manage
-          </Button>
-        </Link>
+        <Button variant="outline" size="sm" onClick={onManageClick}>
+          Manage
+        </Button>
       </div>
     </div>
   );

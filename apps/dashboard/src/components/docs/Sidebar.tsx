@@ -35,31 +35,31 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <nav className="w-56 shrink-0">
-      <div className="sticky top-20 py-6 pr-4 space-y-0.5">
+    <nav className="py-6 pr-6">
+      <div className="space-y-1">
         {navigation.map((item) => (
-          <div key={item.href}>
+          <div key={item.href} className="mb-1">
             <Link
               href={item.href}
               className={cn(
-                'block px-3 py-1.5 rounded-md text-sm',
+                'block px-3 py-2 rounded-md text-sm transition-colors',
                 pathname === item.href
-                  ? 'font-medium text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-primary/10 text-primary font-medium'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               )}
             >
               {item.title}
             </Link>
             {item.children && (
-              <div className="ml-3 mt-0.5 space-y-0.5 border-l border-border/50 pl-3">
+              <div className="ml-4 mt-1 space-y-1 border-l border-border pl-3">
                 {item.children.map((child) => (
                   <Link
                     key={child.href}
                     href={child.href}
                     className={cn(
-                      'block px-2 py-1 rounded text-sm',
+                      'block px-3 py-1.5 rounded-md text-sm transition-colors',
                       pathname === child.href
-                        ? 'text-foreground font-medium'
+                        ? 'text-primary font-medium'
                         : 'text-muted-foreground hover:text-foreground'
                     )}
                   >

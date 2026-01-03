@@ -9,11 +9,18 @@ export default function DocsLayout({
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <div className="max-w-7xl mx-auto px-6 pt-16">
+      <div className="max-w-7xl mx-auto px-6 pt-20">
         <div className="flex">
-          <Sidebar />
-          <main className="flex-1 max-w-3xl py-12">
-            <article className="prose prose-gray dark:prose-invert max-w-none prose-headings:font-semibold prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-pre:bg-[#0d1117] prose-pre:border prose-pre:border-border">
+          {/* Sidebar */}
+          <aside className="w-64 shrink-0">
+            <div className="sticky top-24">
+              <Sidebar />
+            </div>
+          </aside>
+
+          {/* Content */}
+          <main className="flex-1 flex justify-center min-w-0">
+            <article className="w-full max-w-3xl px-8 py-12">
               {children}
             </article>
           </main>
