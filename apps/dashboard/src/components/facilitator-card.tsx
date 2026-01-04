@@ -88,11 +88,12 @@ export function FacilitatorCard({ facilitator, onManageClick }: FacilitatorCardP
   const url = facilitator.url;
 
   // Determine status based on domainStatus from API
+  // Be optimistic: if status is unknown, assume it's working (user will see actual status on detail page)
   const getStatus = (): 'active' | 'pending' | 'expired' => {
-    if (!facilitator.customDomain) return 'pending';
-    if (facilitator.domainStatus === 'active') return 'active';
+    if (!facilitator.customDomain) return 'active'; // Subdomain is always active
     if (facilitator.domainStatus === 'pending' || facilitator.domainStatus === 'not_added') return 'pending';
-    return 'pending';
+    // 'active', 'unknown', or null → assume active
+    return 'active';
   };
 
   const status = getStatus();
