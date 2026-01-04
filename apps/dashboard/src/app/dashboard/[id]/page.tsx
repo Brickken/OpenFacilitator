@@ -240,8 +240,8 @@ export default function FacilitatorDetailPage() {
           Back to dashboard
         </Link>
 
-        {/* DNS Warning Banner - shown when custom domain exists but isn't active */}
-        {facilitator.customDomain && domainStatus?.status !== 'active' && (
+        {/* DNS Warning Banner - only shown after status is loaded and confirmed not active */}
+        {facilitator.customDomain && domainStatus && domainStatus.status !== 'active' && (
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">

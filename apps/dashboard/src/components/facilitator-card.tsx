@@ -10,33 +10,6 @@ interface FacilitatorCardProps {
   onManageClick?: () => void;
 }
 
-function StatusBadge({ status }: { status: 'active' | 'pending' | 'expired' }) {
-  const styles = {
-    active: 'bg-primary/20 text-primary',
-    pending: 'bg-yellow-500/20 text-yellow-500',
-    expired: 'bg-red-500/20 text-red-500',
-  };
-
-  const dotStyles = {
-    active: 'bg-primary',
-    pending: 'bg-yellow-500',
-    expired: 'bg-red-500',
-  };
-
-  const labels = {
-    active: 'Active',
-    pending: 'Pending DNS',
-    expired: 'Expired',
-  };
-
-  return (
-    <span className={`px-2 py-0.5 rounded text-xs font-medium flex items-center gap-1.5 ${styles[status]}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${dotStyles[status]}`} />
-      {labels[status]}
-    </span>
-  );
-}
-
 function FaviconImage({ url, favicon }: { url: string; favicon?: string | null }) {
   const [hasError, setHasError] = useState(false);
 
@@ -86,17 +59,6 @@ function formatNumber(num: number): string {
 export function FacilitatorCard({ facilitator, onManageClick }: FacilitatorCardProps) {
   const domain = facilitator.customDomain || facilitator.subdomain;
   const url = facilitator.url;
-
-  // Determine status based on domainStatus from API
-  // Be optimistic: if status is unknown, assume it's working (user will see actual status on detail page)
-  const getStatus = (): 'active' | 'pending' | 'expired' => {
-    if (!facilitator.customDomain) return 'active'; // Subdomain is always active
-    if (facilitator.domainStatus === 'pending' || facilitator.domainStatus === 'not_added') return 'pending';
-    // 'active', 'unknown', or null → assume active
-    return 'active';
-  };
-
-  const status = getStatus();
   const networksConfigured = facilitator.supportedChains.length;
   const totalSettled = parseFloat(facilitator.stats?.totalSettled || '0');
 
@@ -127,12 +89,9 @@ export function FacilitatorCard({ facilitator, onManageClick }: FacilitatorCardP
           {/* Favicon */}
           <FaviconImage url={url} favicon={facilitator.favicon} />
           
-          {/* Domain + Status */}
+          {/* Domain */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="font-semibold truncate">{domain}</h3>
-              <StatusBadge status={status} />
-            </div>
+            <h3 className="font-semibold truncate">{domain}</h3>
             <a
               href={url}
               target="_blank"
