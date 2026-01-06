@@ -21,6 +21,8 @@ export class OpenFacilitator {
   private readonly baseUrl: string;
   private readonly timeout: number;
   private readonly headers: Record<string, string>;
+  private supportedCache: SupportedResponse | null = null;
+  private supportedPromise: Promise<SupportedResponse> | null = null;
 
   constructor(config: FacilitatorConfig = {}) {
     this.baseUrl = normalizeUrl(config.url ?? DEFAULT_URL);
@@ -129,6 +131,76 @@ export class OpenFacilitator {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Get fee payer address for a specific network.
+   * Fee payers are wallet addresses that pay transaction fees when settling payments.
+   * Currently only Solana networks have fee payers.
+   * @param network - Network identifier (e.g., "solana", "solana:mainnet")
+   * @returns Fee payer address or undefined if not available for the network
+   */
+  async getFeePayer(network: string): Promise<string | undefined> {
+    const supported = await this.getSupportedCached();
+
+    // Look for matching network in kinds (check both exact match and partial match)
+    for (const kind of supported.kinds) {
+      if (kind.network === network || kind.network.includes(network) || network.includes(kind.network)) {
+        if (kind.extra?.feePayer) {
+          return kind.extra.feePayer;
+        }
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Get all fee payers mapped by network.
+   * Fee payers are wallet addresses that pay transaction fees when settling payments.
+   * @returns Map of network identifiers to fee payer addresses
+   */
+  async getFeePayerMap(): Promise<Record<string, string>> {
+    const supported = await this.getSupportedCached();
+    const feePayerMap: Record<string, string> = {};
+
+    for (const kind of supported.kinds) {
+      if (kind.extra?.feePayer) {
+        feePayerMap[kind.network] = kind.extra.feePayer;
+      }
+    }
+
+    return feePayerMap;
+  }
+
+  /**
+   * Get cached supported response, fetching if needed.
+   * Uses deduplication to prevent concurrent requests.
+   */
+  private async getSupportedCached(): Promise<SupportedResponse> {
+    if (this.supportedCache) {
+      return this.supportedCache;
+    }
+
+    // Deduplicate concurrent requests
+    if (!this.supportedPromise) {
+      this.supportedPromise = this.supported().then((response) => {
+        this.supportedCache = response;
+        this.supportedPromise = null;
+        return response;
+      });
+    }
+
+    return this.supportedPromise;
+  }
+
+  /**
+   * Clear cached supported response.
+   * Useful if facilitator configuration may have changed.
+   */
+  clearCache(): void {
+    this.supportedCache = null;
+    this.supportedPromise = null;
   }
 
   /**

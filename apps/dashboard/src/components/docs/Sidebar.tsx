@@ -21,6 +21,7 @@ const navigation: NavItem[] = [
       { title: 'verify()', href: '/docs/sdk/verify' },
       { title: 'settle()', href: '/docs/sdk/settle' },
       { title: 'supported()', href: '/docs/sdk/supported' },
+      { title: 'Fee Payer', href: '/docs/sdk/fee-payer' },
       { title: 'Networks', href: '/docs/sdk/networks' },
       { title: 'Errors', href: '/docs/sdk/errors' },
     ],
