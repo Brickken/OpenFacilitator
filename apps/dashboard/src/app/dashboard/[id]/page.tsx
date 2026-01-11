@@ -482,7 +482,7 @@ export default function FacilitatorDetailPage() {
             </div>
 
             {/* Chart */}
-            <SettlementActivityChart transactions={transactionsData?.transactions || []} />
+            <SettlementActivityChart facilitatorId={id} />
 
             {/* Transactions Table */}
             <Card>

@@ -7,7 +7,7 @@ import {
   updateFacilitator,
   deleteFacilitator,
 } from '../db/facilitators.js';
-import { getTransactionsByFacilitator, getTransactionStats } from '../db/transactions.js';
+import { getTransactionsByFacilitator, getTransactionStats, getDailyStats } from '../db/transactions.js';
 import { getDatabase } from '../db/index.js';
 import { 
   defaultTokens, 
@@ -441,6 +441,30 @@ router.get('/facilitators/:id/transactions', requireAuth, async (req: Request, r
     });
   } catch (error) {
     console.error('Get transactions error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/admin/facilitators/:id/chart-data - Get daily aggregated stats for charts
+ */
+router.get('/facilitators/:id/chart-data', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const facilitator = getFacilitatorById(req.params.id);
+    if (!facilitator) {
+      res.status(404).json({ error: 'Facilitator not found' });
+      return;
+    }
+
+    const days = parseInt(req.query.days as string) || 30;
+    const dailyStats = getDailyStats(req.params.id, days);
+
+    res.json({
+      days,
+      data: dailyStats,
+    });
+  } catch (error) {
+    console.error('Get chart data error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -151,6 +151,48 @@ export function getTransactionStats(facilitatorId: string): {
 }
 
 /**
+ * Get daily aggregated stats for a facilitator (for charts)
+ */
+export function getDailyStats(
+  facilitatorId: string,
+  days: number = 30
+): Array<{
+  date: string;
+  settlements: number;
+  verifications: number;
+  amount: number;
+}> {
+  const db = getDatabase();
+
+  const stmt = db.prepare(`
+    SELECT
+      DATE(created_at) as date,
+      SUM(CASE WHEN type = 'settle' AND status = 'success' THEN 1 ELSE 0 END) as settlements,
+      SUM(CASE WHEN type = 'verify' AND status = 'success' THEN 1 ELSE 0 END) as verifications,
+      COALESCE(SUM(CASE WHEN type = 'settle' AND status = 'success' THEN CAST(amount AS INTEGER) ELSE 0 END), 0) as amount_atomic
+    FROM transactions
+    WHERE facilitator_id = ?
+      AND created_at >= datetime('now', ?)
+    GROUP BY DATE(created_at)
+    ORDER BY date ASC
+  `);
+
+  const results = stmt.all(facilitatorId, `-${days} days`) as Array<{
+    date: string;
+    settlements: number;
+    verifications: number;
+    amount_atomic: number;
+  }>;
+
+  return results.map((row) => ({
+    date: row.date,
+    settlements: row.settlements,
+    verifications: row.verifications,
+    amount: row.amount_atomic / 1_000_000, // Convert atomic units to dollars
+  }));
+}
+
+/**
  * Get global transaction statistics across all facilitators
  */
 export function getGlobalStats(): {

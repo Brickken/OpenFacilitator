@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Activity } from 'lucide-react';
-import type { Transaction } from '@/lib/api';
+import { api, type ChartDataPoint } from '@/lib/api';
 
 interface ActivityDataPoint {
   date: string;
@@ -16,61 +17,47 @@ interface ActivityDataPoint {
 }
 
 interface SettlementActivityChartProps {
-  transactions: Transaction[];
+  facilitatorId: string;
 }
 
-function generateChartData(transactions: Transaction[], days: number): ActivityDataPoint[] {
+function processChartData(rawData: ChartDataPoint[], days: number): ActivityDataPoint[] {
   const now = new Date();
-  const data: ActivityDataPoint[] = [];
+  const dataMap = new Map<string, ChartDataPoint>();
 
-  // Create a map of date -> stats
-  const dateMap = new Map<string, { settlements: number; verifications: number; amount: number }>();
+  // Index existing data by date
+  rawData.forEach((point) => {
+    dataMap.set(point.date, point);
+  });
 
-  // Initialize all days
+  // Generate all days in range and fill in missing days
+  const result: ActivityDataPoint[] = [];
   for (let i = days - 1; i >= 0; i--) {
     const date = new Date(now);
     date.setDate(date.getDate() - i);
     const dateKey = date.toISOString().split('T')[0];
-    dateMap.set(dateKey, { settlements: 0, verifications: 0, amount: 0 });
-  }
 
-  // Aggregate transactions by date
-  transactions.forEach((tx) => {
-    const txDate = new Date(tx.createdAt);
-    const dateKey = txDate.toISOString().split('T')[0];
-
-    if (dateMap.has(dateKey)) {
-      const stats = dateMap.get(dateKey)!;
-      if (tx.type === 'settle') {
-        stats.settlements++;
-        // Parse amount - assuming format like "0.99 USDC" or just a number
-        const amountStr = tx.amount.toString().replace(/[^0-9.]/g, '');
-        stats.amount += parseFloat(amountStr) || 0;
-      } else {
-        stats.verifications++;
-      }
-    }
-  });
-
-  // Convert to array
-  dateMap.forEach((stats, dateKey) => {
-    const date = new Date(dateKey);
-    data.push({
+    const existing = dataMap.get(dateKey);
+    result.push({
       date: dateKey,
       dateFormatted: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      settlements: stats.settlements,
-      verifications: stats.verifications,
-      amount: Math.round(stats.amount * 100) / 100,
+      settlements: existing?.settlements ?? 0,
+      verifications: existing?.verifications ?? 0,
+      amount: existing?.amount ?? 0,
     });
-  });
+  }
 
-  return data;
+  return result;
 }
 
-export function SettlementActivityChart({ transactions }: SettlementActivityChartProps) {
+export function SettlementActivityChart({ facilitatorId }: SettlementActivityChartProps) {
   const [range, setRange] = useState<7 | 30>(7);
-  const data = generateChartData(transactions, range);
 
+  const { data: chartData, isLoading } = useQuery({
+    queryKey: ['chart-data', facilitatorId, range],
+    queryFn: () => api.getChartData(facilitatorId, range),
+  });
+
+  const data = chartData ? processChartData(chartData.data, range) : [];
   const totalSettled = data.reduce((sum, d) => sum + d.amount, 0);
   const totalSettlements = data.reduce((sum, d) => sum + d.settlements, 0);
 
@@ -108,7 +95,11 @@ export function SettlementActivityChart({ transactions }: SettlementActivityChar
         </div>
       </CardHeader>
       <CardContent>
-        {totalSettlements === 0 ? (
+        {isLoading ? (
+          <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
+            Loading chart data...
+          </div>
+        ) : totalSettlements === 0 ? (
           <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
             No settlement activity in this period
           </div>

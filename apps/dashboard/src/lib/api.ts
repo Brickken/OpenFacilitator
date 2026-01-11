@@ -43,6 +43,13 @@ export interface Transaction {
   createdAt: string;
 }
 
+export interface ChartDataPoint {
+  date: string;
+  settlements: number;
+  verifications: number;
+  amount: number;
+}
+
 export interface CreateFacilitatorRequest {
   name: string;
   subdomain: string;
@@ -211,6 +218,14 @@ class ApiClient {
     return this.request(
       `/api/admin/facilitators/${facilitatorId}/transactions?limit=${limit}&offset=${offset}`
     );
+  }
+
+  // Chart Data
+  async getChartData(
+    facilitatorId: string,
+    days: number = 30
+  ): Promise<{ days: number; data: ChartDataPoint[] }> {
+    return this.request(`/api/admin/facilitators/${facilitatorId}/chart-data?days=${days}`);
   }
 
   // Export
