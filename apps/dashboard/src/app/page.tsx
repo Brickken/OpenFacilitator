@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, Globe, Github, Check, Copy, Zap, Code, Sparkles, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Globe, Github, Check, Copy, Zap, Code, Sparkles, ShieldCheck, Link2, Bell } from 'lucide-react';
 import { useState } from 'react';
 import { Navbar } from '@/components/navbar';
 
@@ -238,8 +238,68 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Discovery */}
+      {/* Payment Links & Webhooks */}
       <section className="py-20 px-6">
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-4">
+            Built for builders
+          </h2>
+          <p className="text-muted-foreground text-center mb-12 max-w-2xl mx-auto">
+            Everything you need to monetize your app or API.
+          </p>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Payment Links */}
+            <div className="p-6 rounded-2xl bg-background border border-border flex flex-col">
+              <Link2 className="w-8 h-8 text-primary mb-4" />
+              <h3 className="text-xl font-semibold mb-2">Payment Links</h3>
+              <p className="text-muted-foreground mb-4">
+                Shareable URLs that accept payments. Works for humans (clean UI) and AI agents (x402 protocol) — same link.
+              </p>
+              <ul className="space-y-2 text-sm text-muted-foreground mb-4 flex-1">
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                  No code required
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                  Custom amounts or fixed pricing
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                  Works with any wallet
+                </li>
+              </ul>
+              <Link href="/dashboard" className="text-primary hover:underline text-sm font-medium inline-flex items-center gap-1">
+                Create a payment link <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+
+            {/* Webhooks */}
+            <div className="p-6 rounded-2xl bg-background border border-border flex flex-col">
+              <Bell className="w-8 h-8 text-primary mb-4" />
+              <h3 className="text-xl font-semibold mb-2">Webhooks</h3>
+              <p className="text-muted-foreground mb-4">
+                Get notified instantly when payments complete. Automate fulfillment, unlock content, or trigger any workflow.
+              </p>
+              <div className="bg-[#0d1117] rounded-lg p-3 mb-4 font-mono text-xs overflow-x-auto flex-1">
+                <div className="text-[#8b949e]">// Your webhook receives</div>
+                <div><span className="text-[#ff7b72]">{"{"}</span></div>
+                <div className="pl-3"><span className="text-[#7ee787]">"event"</span>: <span className="text-[#a5d6ff]">"payment.completed"</span>,</div>
+                <div className="pl-3"><span className="text-[#7ee787]">"amount"</span>: <span className="text-[#a5d6ff]">"5.00"</span>,</div>
+                <div className="pl-3"><span className="text-[#7ee787]">"payer"</span>: <span className="text-[#a5d6ff]">"0x..."</span></div>
+                <div><span className="text-[#ff7b72]">{"}"}</span></div>
+              </div>
+              <Link href="/dashboard" className="text-primary hover:underline text-sm font-medium inline-flex items-center gap-1">
+                Set up webhooks <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Discovery */}
+      <section className="py-20 px-6 bg-secondary/30">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-3xl font-bold text-center mb-4">
             x402 Discovery Built In
