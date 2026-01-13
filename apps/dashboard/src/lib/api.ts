@@ -151,6 +151,40 @@ export interface WebhooksResponse {
   webhooks: Webhook[];
 }
 
+// Proxy URLs (API Gateway)
+export interface ProxyUrl {
+  id: string;
+  name: string;
+  slug: string;
+  targetUrl: string;
+  method: string;
+  priceAmount: string;
+  priceAsset: string;
+  priceNetwork: string;
+  payToAddress: string;
+  headersForward: string[];
+  active: boolean;
+  url: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CreateProxyUrlRequest {
+  name: string;
+  slug: string;
+  targetUrl: string;
+  method?: string;
+  priceAmount: string;
+  priceAsset: string;
+  priceNetwork: string;
+  payToAddress: string;
+  headersForward?: string[];
+}
+
+export interface ProxyUrlsResponse {
+  urls: ProxyUrl[];
+}
+
 export interface PaymentLink {
   id: string;
   name: string;
@@ -618,6 +652,50 @@ class ApiClient {
   }> {
     return this.request(`/api/admin/facilitators/${facilitatorId}/webhooks/${webhookId}/test`, {
       method: 'POST',
+    });
+  }
+
+  // Proxy URLs (API Gateway)
+  async getProxyUrls(facilitatorId: string): Promise<ProxyUrlsResponse> {
+    return this.request(`/api/admin/facilitators/${facilitatorId}/urls`);
+  }
+
+  async createProxyUrl(facilitatorId: string, data: CreateProxyUrlRequest): Promise<ProxyUrl> {
+    return this.request(`/api/admin/facilitators/${facilitatorId}/urls`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getProxyUrl(facilitatorId: string, urlId: string): Promise<ProxyUrl> {
+    return this.request(`/api/admin/facilitators/${facilitatorId}/urls/${urlId}`);
+  }
+
+  async updateProxyUrl(
+    facilitatorId: string,
+    urlId: string,
+    data: Partial<{
+      name: string;
+      slug: string;
+      targetUrl: string;
+      method: string;
+      priceAmount: string;
+      priceAsset: string;
+      priceNetwork: string;
+      payToAddress: string;
+      headersForward: string[];
+      active: boolean;
+    }>
+  ): Promise<ProxyUrl> {
+    return this.request(`/api/admin/facilitators/${facilitatorId}/urls/${urlId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteProxyUrl(facilitatorId: string, urlId: string): Promise<void> {
+    return this.request(`/api/admin/facilitators/${facilitatorId}/urls/${urlId}`, {
+      method: 'DELETE',
     });
   }
 }

@@ -31,6 +31,14 @@ import {
   getPendingFacilitatorByUserId,
   deletePendingFacilitatorsForUser,
 } from '../db/pending-facilitators.js';
+import {
+  createProxyUrl,
+  getProxyUrlById,
+  getProxyUrlsByFacilitator,
+  updateProxyUrl,
+  deleteProxyUrl,
+  isSlugUnique,
+} from '../db/proxy-urls.js';
 import { getDatabase } from '../db/index.js';
 import { 
   defaultTokens, 
@@ -2126,6 +2134,283 @@ router.delete('/facilitators/:id/payment-links/:linkId', requireAuth, async (req
     res.status(204).send();
   } catch (error) {
     console.error('Delete payment link error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// =============================================================================
+// Proxy URLs (API Gateway)
+// =============================================================================
+
+const createProxyUrlSchema = z.object({
+  name: z.string().min(1).max(100),
+  slug: z.string().min(1).max(63).regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/, 'Invalid slug format (lowercase, numbers, hyphens)'),
+  targetUrl: z.string().url().max(2048),
+  method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'ANY']).optional(),
+  priceAmount: z.string().min(1), // Atomic units
+  priceAsset: z.string().min(1),  // Token address
+  priceNetwork: z.string().min(1), // e.g., 'base', 'solana'
+  payToAddress: z.string().min(1), // Wallet address to receive payments
+  headersForward: z.array(z.string()).optional(),
+});
+
+const updateProxyUrlSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  slug: z.string().min(1).max(63).regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/, 'Invalid slug format').optional(),
+  targetUrl: z.string().url().max(2048).optional(),
+  method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'ANY']).optional(),
+  priceAmount: z.string().min(1).optional(),
+  priceAsset: z.string().min(1).optional(),
+  priceNetwork: z.string().min(1).optional(),
+  payToAddress: z.string().min(1).optional(),
+  headersForward: z.array(z.string()).optional(),
+  active: z.boolean().optional(),
+});
+
+/**
+ * Helper to build proxy URL
+ */
+function getProxyUrlEndpoint(subdomain: string, customDomain: string | null, slug: string): string {
+  const baseUrl = customDomain
+    ? `https://${customDomain}`
+    : `https://${subdomain}.openfacilitator.io`;
+  return `${baseUrl}/u/${slug}`;
+}
+
+/**
+ * GET /api/admin/facilitators/:id/urls - List proxy URLs
+ */
+router.get('/facilitators/:id/urls', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const facilitator = getFacilitatorById(req.params.id);
+    if (!facilitator) {
+      res.status(404).json({ error: 'Facilitator not found' });
+      return;
+    }
+
+    const urls = getProxyUrlsByFacilitator(req.params.id);
+
+    const urlsResponse = urls.map((url) => ({
+      id: url.id,
+      name: url.name,
+      slug: url.slug,
+      targetUrl: url.target_url,
+      method: url.method,
+      priceAmount: url.price_amount,
+      priceAsset: url.price_asset,
+      priceNetwork: url.price_network,
+      payToAddress: url.pay_to_address,
+      headersForward: JSON.parse(url.headers_forward),
+      active: url.active === 1,
+      url: getProxyUrlEndpoint(facilitator.subdomain, facilitator.custom_domain, url.slug),
+      createdAt: formatSqliteDate(url.created_at),
+      updatedAt: formatSqliteDate(url.updated_at),
+    }));
+
+    res.json({ urls: urlsResponse });
+  } catch (error) {
+    console.error('List proxy URLs error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/admin/facilitators/:id/urls - Create proxy URL
+ */
+router.post('/facilitators/:id/urls', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const parsed = createProxyUrlSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: 'Invalid request',
+        details: parsed.error.issues,
+      });
+      return;
+    }
+
+    const facilitator = getFacilitatorById(req.params.id);
+    if (!facilitator) {
+      res.status(404).json({ error: 'Facilitator not found' });
+      return;
+    }
+
+    // Check slug uniqueness
+    if (!isSlugUnique(req.params.id, parsed.data.slug)) {
+      res.status(400).json({ error: 'Slug already exists for this facilitator' });
+      return;
+    }
+
+    const url = createProxyUrl({
+      facilitator_id: req.params.id,
+      name: parsed.data.name,
+      slug: parsed.data.slug,
+      target_url: parsed.data.targetUrl,
+      method: parsed.data.method,
+      price_amount: parsed.data.priceAmount,
+      price_asset: parsed.data.priceAsset,
+      price_network: parsed.data.priceNetwork,
+      pay_to_address: parsed.data.payToAddress,
+      headers_forward: parsed.data.headersForward,
+    });
+
+    res.status(201).json({
+      id: url.id,
+      name: url.name,
+      slug: url.slug,
+      targetUrl: url.target_url,
+      method: url.method,
+      priceAmount: url.price_amount,
+      priceAsset: url.price_asset,
+      priceNetwork: url.price_network,
+      payToAddress: url.pay_to_address,
+      headersForward: JSON.parse(url.headers_forward),
+      active: url.active === 1,
+      url: getProxyUrlEndpoint(facilitator.subdomain, facilitator.custom_domain, url.slug),
+      createdAt: formatSqliteDate(url.created_at),
+    });
+  } catch (error) {
+    console.error('Create proxy URL error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/admin/facilitators/:id/urls/:urlId - Get proxy URL details
+ */
+router.get('/facilitators/:id/urls/:urlId', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const facilitator = getFacilitatorById(req.params.id);
+    if (!facilitator) {
+      res.status(404).json({ error: 'Facilitator not found' });
+      return;
+    }
+
+    const url = getProxyUrlById(req.params.urlId);
+    if (!url || url.facilitator_id !== req.params.id) {
+      res.status(404).json({ error: 'URL not found' });
+      return;
+    }
+
+    res.json({
+      id: url.id,
+      name: url.name,
+      slug: url.slug,
+      targetUrl: url.target_url,
+      method: url.method,
+      priceAmount: url.price_amount,
+      priceAsset: url.price_asset,
+      priceNetwork: url.price_network,
+      payToAddress: url.pay_to_address,
+      headersForward: JSON.parse(url.headers_forward),
+      active: url.active === 1,
+      url: getProxyUrlEndpoint(facilitator.subdomain, facilitator.custom_domain, url.slug),
+      createdAt: formatSqliteDate(url.created_at),
+      updatedAt: formatSqliteDate(url.updated_at),
+    });
+  } catch (error) {
+    console.error('Get proxy URL error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * PATCH /api/admin/facilitators/:id/urls/:urlId - Update proxy URL
+ */
+router.patch('/facilitators/:id/urls/:urlId', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const parsed = updateProxyUrlSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: 'Invalid request',
+        details: parsed.error.issues,
+      });
+      return;
+    }
+
+    const facilitator = getFacilitatorById(req.params.id);
+    if (!facilitator) {
+      res.status(404).json({ error: 'Facilitator not found' });
+      return;
+    }
+
+    const existingUrl = getProxyUrlById(req.params.urlId);
+    if (!existingUrl || existingUrl.facilitator_id !== req.params.id) {
+      res.status(404).json({ error: 'URL not found' });
+      return;
+    }
+
+    // Check slug uniqueness if being updated
+    if (parsed.data.slug && !isSlugUnique(req.params.id, parsed.data.slug, req.params.urlId)) {
+      res.status(400).json({ error: 'Slug already exists for this facilitator' });
+      return;
+    }
+
+    const updates: Parameters<typeof updateProxyUrl>[1] = {};
+    if (parsed.data.name !== undefined) updates.name = parsed.data.name;
+    if (parsed.data.slug !== undefined) updates.slug = parsed.data.slug;
+    if (parsed.data.targetUrl !== undefined) updates.target_url = parsed.data.targetUrl;
+    if (parsed.data.method !== undefined) updates.method = parsed.data.method;
+    if (parsed.data.priceAmount !== undefined) updates.price_amount = parsed.data.priceAmount;
+    if (parsed.data.priceAsset !== undefined) updates.price_asset = parsed.data.priceAsset;
+    if (parsed.data.priceNetwork !== undefined) updates.price_network = parsed.data.priceNetwork;
+    if (parsed.data.payToAddress !== undefined) updates.pay_to_address = parsed.data.payToAddress;
+    if (parsed.data.headersForward !== undefined) updates.headers_forward = parsed.data.headersForward;
+    if (parsed.data.active !== undefined) updates.active = parsed.data.active;
+
+    const url = updateProxyUrl(req.params.urlId, updates);
+    if (!url) {
+      res.status(500).json({ error: 'Failed to update URL' });
+      return;
+    }
+
+    res.json({
+      id: url.id,
+      name: url.name,
+      slug: url.slug,
+      targetUrl: url.target_url,
+      method: url.method,
+      priceAmount: url.price_amount,
+      priceAsset: url.price_asset,
+      priceNetwork: url.price_network,
+      payToAddress: url.pay_to_address,
+      headersForward: JSON.parse(url.headers_forward),
+      active: url.active === 1,
+      url: getProxyUrlEndpoint(facilitator.subdomain, facilitator.custom_domain, url.slug),
+      createdAt: formatSqliteDate(url.created_at),
+      updatedAt: formatSqliteDate(url.updated_at),
+    });
+  } catch (error) {
+    console.error('Update proxy URL error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * DELETE /api/admin/facilitators/:id/urls/:urlId - Delete proxy URL
+ */
+router.delete('/facilitators/:id/urls/:urlId', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const facilitator = getFacilitatorById(req.params.id);
+    if (!facilitator) {
+      res.status(404).json({ error: 'Facilitator not found' });
+      return;
+    }
+
+    const url = getProxyUrlById(req.params.urlId);
+    if (!url || url.facilitator_id !== req.params.id) {
+      res.status(404).json({ error: 'URL not found' });
+      return;
+    }
+
+    const deleted = deleteProxyUrl(req.params.urlId);
+    if (!deleted) {
+      res.status(500).json({ error: 'Failed to delete URL' });
+      return;
+    }
+
+    res.status(204).send();
+  } catch (error) {
+    console.error('Delete proxy URL error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

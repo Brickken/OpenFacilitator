@@ -13,6 +13,7 @@ import { decryptPrivateKey } from '../utils/crypto.js';
 import { sendSettlementWebhook, deliverWebhook, generateWebhookSecret, type PaymentLinkWebhookPayload } from '../services/webhook.js';
 import { executeAction, type ActionResult } from '../services/actions.js';
 import { getWebhookById } from '../db/webhooks.js';
+import { getProxyUrlBySlug } from '../db/proxy-urls.js';
 import type { Hex } from 'viem';
 
 const router: IRouter = Router();
@@ -1671,6 +1672,883 @@ router.post('/pay/:linkId/complete', async (req: Request, res: Response) => {
     success: true,
     paymentId: payment.id,
   });
+});
+
+// =============================================================================
+// Proxy URLs (API Gateway with x402)
+// =============================================================================
+
+/**
+ * Helper to build proxy URL payment requirements
+ */
+function buildProxyUrlPaymentRequirements(
+  proxyUrl: { price_network: string; price_amount: string; price_asset: string; pay_to_address: string; name: string; slug: string },
+  record: { encrypted_solana_private_key: string | null; custom_domain: string | null; subdomain: string }
+): { requirements: Record<string, unknown>; error?: string } {
+  const facilitatorUrl = record.custom_domain
+    ? `https://${record.custom_domain}`
+    : `https://${record.subdomain}.openfacilitator.io`;
+
+  const isSolana = proxyUrl.price_network === 'solana' ||
+                   proxyUrl.price_network === 'solana-mainnet' ||
+                   proxyUrl.price_network === 'solana-devnet' ||
+                   proxyUrl.price_network.startsWith('solana:');
+
+  const requirements: Record<string, unknown> = {
+    scheme: 'exact',
+    network: proxyUrl.price_network,
+    maxAmountRequired: proxyUrl.price_amount,
+    asset: proxyUrl.price_asset,
+    payTo: proxyUrl.pay_to_address,
+    description: proxyUrl.name,
+    resource: `${facilitatorUrl}/u/${proxyUrl.slug}`,
+  };
+
+  if (isSolana && record.encrypted_solana_private_key) {
+    try {
+      const solanaPrivateKey = decryptPrivateKey(record.encrypted_solana_private_key);
+      const solanaFeePayer = getSolanaPublicKey(solanaPrivateKey);
+      requirements.extra = { feePayer: solanaFeePayer };
+    } catch (e) {
+      return { requirements, error: 'Solana wallet not configured properly' };
+    }
+  } else if (isSolana) {
+    return { requirements, error: 'Solana wallet not configured for this facilitator' };
+  }
+
+  return { requirements };
+}
+
+/**
+ * Generate the proxy URL payment page HTML
+ */
+function generateProxyUrlPaymentPage(
+  proxyUrl: { id: string; name: string; slug: string; target_url: string; price_amount: string; price_asset: string; price_network: string },
+  record: { name: string; subdomain: string; custom_domain: string | null }
+): string {
+  const amountNum = parseFloat(proxyUrl.price_amount) / 1e6;
+  const formattedAmount = amountNum.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const networkDisplay = proxyUrl.price_network.charAt(0).toUpperCase() + proxyUrl.price_network.slice(1);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Access ${proxyUrl.name} - $${formattedAmount}</title>
+  <link rel="icon" href="/favicon.ico">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+    }
+    .left-col {
+      width: 50%;
+      min-height: 100vh;
+      background: #0B64F4;
+      color: #fff;
+      padding: 48px;
+      display: flex;
+      justify-content: flex-end;
+    }
+    .left-inner {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      padding-right: 48px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 48px;
+    }
+    .brand-logo {
+      width: 32px;
+      height: 32px;
+    }
+    .brand-name {
+      font-size: 18px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.9);
+    }
+    .payment-header {
+      font-size: 14px;
+      color: rgba(255,255,255,0.6);
+      margin-bottom: 8px;
+    }
+    .payment-title {
+      font-size: 20px;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    .payment-amount {
+      font-size: 36px;
+      font-weight: 600;
+      margin-bottom: 32px;
+    }
+    .payment-amount span {
+      font-size: 18px;
+      color: rgba(255,255,255,0.6);
+      font-weight: 400;
+    }
+    .order-summary {
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .order-item {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      margin-bottom: 16px;
+    }
+    .order-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .order-details { flex: 1; }
+    .order-name { font-weight: 500; margin-bottom: 2px; }
+    .order-desc { font-size: 13px; color: rgba(255,255,255,0.5); }
+    .order-price { font-weight: 500; }
+    .order-total {
+      display: flex;
+      justify-content: space-between;
+      font-size: 15px;
+    }
+    .order-total-label { color: rgba(255,255,255,0.7); }
+    .order-total-value { font-weight: 600; }
+    .network-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255,255,255,0.1);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+    }
+    .network-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #00d4aa;
+    }
+    .spacer { flex: 1; }
+    .powered-by {
+      font-size: 12px;
+      color: rgba(255,255,255,0.4);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .powered-by a {
+      color: rgba(255,255,255,0.6);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .powered-by a:hover { color: #fff; }
+    .right-col {
+      width: 50%;
+      min-height: 100vh;
+      background: #fff;
+      color: #1a1a1a;
+      padding: 48px;
+      display: flex;
+    }
+    .right-inner {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      padding-left: 48px;
+    }
+    .right-header {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 32px;
+      color: #1a1a1a;
+    }
+    .wallet-section {
+      background: #f7f7f7;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .wallet-label {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 12px;
+      font-weight: 500;
+    }
+    .wallet-status {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .wallet-icon {
+      width: 40px;
+      height: 40px;
+      background: #fff;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #e5e5e5;
+    }
+    .wallet-placeholder {
+      color: #999;
+      font-size: 14px;
+    }
+    .wallet-address {
+      font-family: monospace;
+      font-size: 14px;
+      color: #333;
+    }
+    .pay-button {
+      width: 100%;
+      padding: 16px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: #0B64F4;
+      color: white;
+      transition: background 0.2s;
+      margin-bottom: 16px;
+    }
+    .pay-button:hover:not(:disabled) { background: #0A5AD8; }
+    .pay-button:disabled { background: #ccc; cursor: not-allowed; }
+    .status {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+    .status.error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+    .status.success { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+    .status.pending { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
+    .info-text {
+      font-size: 13px;
+      color: #666;
+      line-height: 1.5;
+    }
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (max-width: 768px) {
+      body { flex-direction: column; }
+      .left-col, .right-col {
+        width: 100%;
+        min-height: auto;
+        padding: 32px 24px;
+        justify-content: flex-start;
+      }
+      .left-inner, .right-inner {
+        max-width: 100%;
+        padding: 0;
+      }
+      .left-col { padding-bottom: 24px; }
+      .spacer { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="left-col">
+    <div class="left-inner">
+      <div class="brand">
+        <svg class="brand-logo" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="180" height="180" rx="24" fill="rgba(255,255,255,0.2)"/>
+          <path d="M130 94.9983C130 119.998 112.5 132.498 91.7 139.748C90.6108 140.117 89.4277 140.1 88.35 139.698C67.5 132.498 50 119.998 50 94.9983V59.9983C50 58.6723 50.5268 57.4005 51.4645 56.4628C52.4021 55.5251 53.6739 54.9983 55 54.9983C65 54.9983 77.5 48.9983 86.2 41.3983C87.2593 40.4933 88.6068 39.9961 90 39.9961C91.3932 39.9961 92.7407 40.4933 93.8 41.3983C102.55 49.0483 115 54.9983 125 54.9983C126.326 54.9983 127.598 55.5251 128.536 56.4628C129.473 57.4005 130 58.6723 130 59.9983V94.9983Z" stroke="white" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M75 90L85 100L105 80" stroke="white" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="brand-name">${record.name}</span>
+      </div>
+
+      <div class="payment-header">Pay to access</div>
+      <div class="payment-title">${proxyUrl.name}</div>
+      <div class="payment-amount">$${formattedAmount} <span>USDC</span></div>
+
+      <div class="order-summary">
+        <div class="order-item">
+          <div class="order-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            </svg>
+          </div>
+          <div class="order-details">
+            <div class="order-name">${proxyUrl.name}</div>
+            <div class="order-desc">One-time access</div>
+          </div>
+          <div class="order-price">$${formattedAmount}</div>
+        </div>
+        <div class="order-total">
+          <span class="order-total-label">Total</span>
+          <span class="order-total-value">$${formattedAmount}</span>
+        </div>
+      </div>
+
+      <div class="network-badge">
+        <span class="network-dot"></span>
+        ${networkDisplay} Network
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="powered-by">
+        Powered by
+        <a href="https://openfacilitator.io" target="_blank">
+          <svg width="16" height="16" viewBox="0 0 180 180" fill="none"><rect width="180" height="180" rx="24" fill="rgba(255,255,255,0.3)"/><path d="M130 94.9983C130 119.998 112.5 132.498 91.7 139.748C90.6108 140.117 89.4277 140.1 88.35 139.698C67.5 132.498 50 119.998 50 94.9983V59.9983C50 58.6723 50.5268 57.4005 51.4645 56.4628C52.4021 55.5251 53.6739 54.9983 55 54.9983C65 54.9983 77.5 48.9983 86.2 41.3983C87.2593 40.4933 88.6068 39.9961 90 39.9961C91.3932 39.9961 92.7407 40.4933 93.8 41.3983C102.55 49.0483 115 54.9983 125 54.9983C126.326 54.9983 127.598 55.5251 128.536 56.4628C129.473 57.4005 130 58.6723 130 59.9983V94.9983Z" stroke="white" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><path d="M75 90L85 100L105 80" stroke="white" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          OpenFacilitator
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="right-col">
+    <div class="right-inner">
+      <div class="right-header">Pay with crypto</div>
+
+      <div class="wallet-section">
+        <div class="wallet-label">Wallet</div>
+        <div class="wallet-status" id="walletStatus">
+          <div class="wallet-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M16 14a2 2 0 100-4 2 2 0 000 4z"/></svg>
+          </div>
+          <span class="wallet-placeholder">No wallet connected</span>
+        </div>
+      </div>
+
+      <div id="status" class="status" style="display: none;"></div>
+
+      <button id="payButton" class="pay-button">Connect Wallet</button>
+
+      <p class="info-text">
+        You'll be asked to connect your wallet and sign a payment authorization.
+        After payment, you'll be redirected to access the content.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const SLUG = '${proxyUrl.slug}';
+    const AMOUNT = '${proxyUrl.price_amount}';
+    const ASSET = '${proxyUrl.price_asset}';
+    const NETWORK = '${proxyUrl.price_network}';
+    const TARGET_URL = '${proxyUrl.target_url}';
+    const IS_SOLANA = NETWORK === 'solana' || NETWORK === 'solana-devnet' || NETWORK.startsWith('solana:');
+
+    function showStatus(message, type) {
+      const el = document.getElementById('status');
+      el.textContent = message;
+      el.className = 'status ' + type;
+      el.style.display = 'block';
+    }
+
+    let connectedAddress = null;
+
+    function setLoading(loading, text) {
+      const btn = document.getElementById('payButton');
+      btn.disabled = loading;
+      if (loading) {
+        btn.innerHTML = '<span class="spinner"></span>' + (text || 'Processing...');
+      } else if (connectedAddress) {
+        btn.innerHTML = 'Pay $${formattedAmount}';
+      } else {
+        btn.innerHTML = 'Connect Wallet';
+      }
+    }
+
+    function updateWalletUI(address) {
+      const walletStatus = document.getElementById('walletStatus');
+      if (address) {
+        const short = address.slice(0, 6) + '...' + address.slice(-4);
+        walletStatus.innerHTML = \`
+          <div class="wallet-icon" style="background: #f0fdf4; border-color: #bbf7d0;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+          </div>
+          <span class="wallet-address">\${short}</span>
+        \`;
+      }
+    }
+
+    function getSolanaWallet() {
+      if (window.phantom?.solana?.isPhantom) return window.phantom.solana;
+      if (window.solana?.isPhantom) return window.solana;
+      if (window.solflare?.isSolflare) return window.solflare;
+      return null;
+    }
+
+    async function loadSolanaLibs() {
+      if (window.solanaWeb3 && window.splToken) return;
+      await Promise.all([
+        new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://unpkg.com/@solana/web3.js@1.95.3/lib/index.iife.min.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        }),
+        new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://unpkg.com/@solana/spl-token@0.4.8/lib/cjs/index.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        })
+      ]);
+      await new Promise(r => setTimeout(r, 100));
+    }
+
+    async function connectAndPaySolana() {
+      try {
+        const wallet = getSolanaWallet();
+        if (!wallet) {
+          showStatus('Please install Phantom or another Solana wallet', 'error');
+          return;
+        }
+
+        setLoading(true, 'Connecting...');
+
+        const resp = await wallet.connect();
+        const userPublicKey = resp.publicKey.toString();
+        connectedAddress = userPublicKey;
+        updateWalletUI(userPublicKey);
+
+        setLoading(true, 'Preparing payment...');
+
+        const reqRes = await fetch('/u/' + SLUG + '/requirements');
+        if (!reqRes.ok) throw new Error('Failed to get payment requirements');
+        const { paymentRequirements, facilitatorUrl, solanaRpcUrl } = await reqRes.json();
+
+        const usdcMint = ASSET;
+        const recipientAddress = paymentRequirements.payTo;
+        const feePayer = paymentRequirements.extra?.feePayer;
+
+        if (!feePayer) throw new Error('Facilitator fee payer not configured');
+
+        if (!window.solanaWeb3) {
+          setLoading(true, 'Loading Solana libraries...');
+          await loadSolanaLibs();
+        }
+
+        const { Connection, PublicKey, Transaction } = window.solanaWeb3;
+        const { getAssociatedTokenAddress, createTransferInstruction, createAssociatedTokenAccountInstruction, getAccount } = window.splToken;
+
+        const rpcUrl = solanaRpcUrl || 'https://api.mainnet-beta.solana.com';
+        const connection = new Connection(rpcUrl, 'confirmed');
+
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+
+        const senderPubkey = new PublicKey(userPublicKey);
+        const recipientPubkey = new PublicKey(recipientAddress);
+        const feePayerPubkey = new PublicKey(feePayer);
+        const mintPubkey = new PublicKey(usdcMint);
+
+        const senderATA = await getAssociatedTokenAddress(mintPubkey, senderPubkey);
+        const recipientATA = await getAssociatedTokenAddress(mintPubkey, recipientPubkey);
+
+        const transaction = new Transaction();
+        transaction.recentBlockhash = blockhash;
+        transaction.lastValidBlockHeight = lastValidBlockHeight;
+        transaction.feePayer = feePayerPubkey;
+
+        try {
+          await getAccount(connection, recipientATA);
+        } catch {
+          transaction.add(
+            createAssociatedTokenAccountInstruction(feePayerPubkey, recipientATA, recipientPubkey, mintPubkey)
+          );
+        }
+
+        transaction.add(
+          createTransferInstruction(senderATA, recipientATA, senderPubkey, BigInt(AMOUNT))
+        );
+
+        setLoading(true, 'Waiting for signature...');
+
+        const signedTransaction = await wallet.signTransaction(transaction);
+        const serializedTx = signedTransaction.serialize({ requireAllSignatures: false, verifySignatures: false });
+        const signedTxBase64 = btoa(String.fromCharCode(...serializedTx));
+
+        const paymentPayload = {
+          x402Version: 1,
+          scheme: 'exact',
+          network: NETWORK,
+          payload: { transaction: signedTxBase64 }
+        };
+
+        setLoading(true, 'Processing payment...');
+
+        const settleRes = await fetch(facilitatorUrl + '/settle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            x402Version: 1,
+            paymentPayload: btoa(JSON.stringify(paymentPayload)),
+            paymentRequirements
+          })
+        });
+
+        const settleResult = await settleRes.json();
+
+        if (settleResult.success) {
+          showStatus('Payment successful! Redirecting...', 'success');
+          setTimeout(() => {
+            window.location.href = TARGET_URL;
+          }, 1500);
+        } else {
+          throw new Error(settleResult.errorMessage || 'Settlement failed');
+        }
+      } catch (error) {
+        console.error('Payment error:', error);
+        showStatus(error.message || 'Payment failed', 'error');
+        setLoading(false);
+      }
+    }
+
+    async function connectAndPayEVM() {
+      try {
+        if (!window.ethereum) {
+          showStatus('Please install MetaMask or another Ethereum wallet', 'error');
+          return;
+        }
+
+        setLoading(true, 'Connecting...');
+
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        const userAddress = accounts[0];
+        connectedAddress = userAddress;
+        updateWalletUI(userAddress);
+
+        setLoading(true, 'Preparing payment...');
+
+        const reqRes = await fetch('/u/' + SLUG + '/requirements');
+        if (!reqRes.ok) throw new Error('Failed to get payment requirements');
+        const { paymentRequirements, facilitatorUrl } = await reqRes.json();
+
+        const deadline = Math.floor(Date.now() / 1000) + 3600;
+        const nonce = '0x' + [...crypto.getRandomValues(new Uint8Array(32))].map(b => b.toString(16).padStart(2, '0')).join('');
+
+        const authorization = {
+          from: userAddress,
+          to: paymentRequirements.payTo,
+          value: paymentRequirements.maxAmountRequired,
+          validAfter: 0,
+          validBefore: deadline,
+          nonce: nonce
+        };
+
+        setLoading(true, 'Waiting for signature...');
+
+        const domain = {
+          name: 'USD Coin',
+          version: '2',
+          chainId: 8453,
+          verifyingContract: ASSET
+        };
+
+        const types = {
+          TransferWithAuthorization: [
+            { name: 'from', type: 'address' },
+            { name: 'to', type: 'address' },
+            { name: 'value', type: 'uint256' },
+            { name: 'validAfter', type: 'uint256' },
+            { name: 'validBefore', type: 'uint256' },
+            { name: 'nonce', type: 'bytes32' }
+          ]
+        };
+
+        const signature = await window.ethereum.request({
+          method: 'eth_signTypedData_v4',
+          params: [userAddress, JSON.stringify({ types, primaryType: 'TransferWithAuthorization', domain, message: authorization })]
+        });
+
+        const paymentPayload = {
+          x402Version: 1,
+          scheme: 'exact',
+          network: NETWORK,
+          payload: { signature, authorization }
+        };
+
+        setLoading(true, 'Processing payment...');
+
+        const settleRes = await fetch(facilitatorUrl + '/settle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            x402Version: 1,
+            paymentPayload: btoa(JSON.stringify(paymentPayload)),
+            paymentRequirements
+          })
+        });
+
+        const settleResult = await settleRes.json();
+
+        if (settleResult.success) {
+          showStatus('Payment successful! Redirecting...', 'success');
+          setTimeout(() => {
+            window.location.href = TARGET_URL;
+          }, 1500);
+        } else {
+          throw new Error(settleResult.errorMessage || 'Settlement failed');
+        }
+      } catch (error) {
+        console.error('Payment error:', error);
+        showStatus(error.message || 'Payment failed', 'error');
+        setLoading(false);
+      }
+    }
+
+    document.getElementById('payButton').addEventListener('click', () => {
+      if (IS_SOLANA) {
+        connectAndPaySolana();
+      } else {
+        connectAndPayEVM();
+      }
+    });
+  </script>
+</body>
+</html>`;
+}
+
+/**
+ * GET /u/:slug/requirements - Get payment requirements for a proxy URL
+ */
+router.get('/u/:slug/requirements', async (req: Request, res: Response) => {
+  const facilitatorId = req.facilitator?.id;
+  if (!facilitatorId) {
+    res.status(500).json({ error: 'Facilitator context not available' });
+    return;
+  }
+
+  const record = getFacilitatorById(facilitatorId);
+  if (!record) {
+    res.status(404).json({ error: 'Facilitator not found' });
+    return;
+  }
+
+  const proxyUrl = getProxyUrlBySlug(facilitatorId, req.params.slug);
+  if (!proxyUrl || !proxyUrl.active) {
+    res.status(404).json({ error: 'URL not found' });
+    return;
+  }
+
+  const facilitatorUrl = record.custom_domain
+    ? `https://${record.custom_domain}`
+    : `https://${record.subdomain}.openfacilitator.io`;
+
+  const { requirements, error } = buildProxyUrlPaymentRequirements(proxyUrl, record);
+  if (error) {
+    res.status(500).json({ error });
+    return;
+  }
+
+  res.json({
+    paymentRequirements: requirements,
+    facilitatorUrl,
+    solanaRpcUrl: process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com',
+  });
+});
+
+/**
+ * ALL /u/:slug - Proxy endpoint with x402 payment
+ *
+ * Content negotiation:
+ * - Accept: text/html (browser) → renders payment UI
+ * - Accept: application/json (or X-Payment header) → x402 protocol
+ */
+router.all('/u/:slug', async (req: Request, res: Response) => {
+  const facilitatorId = req.facilitator?.id;
+  if (!facilitatorId) {
+    res.status(500).json({ error: 'Facilitator context not available' });
+    return;
+  }
+
+  const record = getFacilitatorById(facilitatorId);
+  if (!record) {
+    res.status(404).json({ error: 'Facilitator not found' });
+    return;
+  }
+
+  const proxyUrl = getProxyUrlBySlug(facilitatorId, req.params.slug);
+  if (!proxyUrl) {
+    res.status(404).json({ error: 'URL not found' });
+    return;
+  }
+
+  if (!proxyUrl.active) {
+    res.status(410).json({ error: 'URL is inactive' });
+    return;
+  }
+
+  // Content negotiation
+  const acceptHeader = req.get('Accept') || '';
+  const paymentHeader = req.get('X-Payment');
+  const wantsJson = acceptHeader.includes('application/json') || paymentHeader;
+
+  // Check method if not ANY (only for API requests, browsers always GET)
+  if (wantsJson && proxyUrl.method !== 'ANY' && req.method !== proxyUrl.method) {
+    res.status(405).json({ error: `Method ${req.method} not allowed. Expected ${proxyUrl.method}` });
+    return;
+  }
+
+  const facilitatorUrl = record.custom_domain
+    ? `https://${record.custom_domain}`
+    : `https://${record.subdomain}.openfacilitator.io`;
+
+  const { requirements: paymentRequirements, error: reqError } = buildProxyUrlPaymentRequirements(proxyUrl, record);
+  if (reqError) {
+    if (wantsJson) {
+      res.status(500).json({ error: reqError });
+    } else {
+      res.status(500).send(`<html><body><h1>Error</h1><p>${reqError}</p></body></html>`);
+    }
+    return;
+  }
+
+  // === HTML Payment Page (for browsers) ===
+  if (!wantsJson && !paymentHeader) {
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.openfacilitator.io https://api.mainnet-beta.solana.com https://api.devnet.solana.com https://*.solana.com https://*.helius-rpc.com https://*.helius.xyz https://*.quicknode.com https://cdn.jsdelivr.net; img-src 'self' data:; font-src 'self';"
+    );
+    res.send(generateProxyUrlPaymentPage(proxyUrl, record));
+    return;
+  }
+
+  // === x402 Protocol Handler (for API clients) ===
+  if (!paymentHeader) {
+    res.status(402).json({
+      x402Version: 1,
+      accepts: [paymentRequirements],
+      error: 'Payment Required',
+      message: proxyUrl.name,
+    });
+    return;
+  }
+
+  // Payment provided - verify and settle
+  try {
+    let paymentPayload: unknown;
+    try {
+      const decoded = Buffer.from(paymentHeader, 'base64').toString('utf-8');
+      paymentPayload = JSON.parse(decoded);
+    } catch {
+      res.status(400).json({ error: 'Invalid X-Payment header encoding' });
+      return;
+    }
+
+    const verifyResponse = await fetch(`${facilitatorUrl}/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        x402Version: 1,
+        paymentPayload,
+        paymentRequirements,
+      }),
+    });
+
+    const verifyResult = (await verifyResponse.json()) as {
+      valid?: boolean;
+      invalidReason?: string;
+      payer?: string;
+    };
+
+    if (!verifyResult.valid) {
+      res.status(402).json({
+        error: 'Payment verification failed',
+        reason: verifyResult.invalidReason,
+        accepts: [paymentRequirements],
+      });
+      return;
+    }
+
+    const settleResponse = await fetch(`${facilitatorUrl}/settle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        x402Version: 1,
+        paymentPayload,
+        paymentRequirements,
+      }),
+    });
+
+    const settleResult = (await settleResponse.json()) as {
+      success?: boolean;
+      transactionHash?: string;
+      errorMessage?: string;
+      payer?: string;
+    };
+
+    if (!settleResult.success) {
+      res.status(402).json({
+        error: 'Payment settlement failed',
+        reason: settleResult.errorMessage,
+        accepts: [paymentRequirements],
+      });
+      return;
+    }
+
+    console.log(`[Proxy URL] Payment settled for ${proxyUrl.slug}: ${settleResult.transactionHash}`);
+
+    // === Payment successful - forward request to target URL ===
+    const headersForward = JSON.parse(proxyUrl.headers_forward) as string[];
+    const forwardHeaders: Record<string, string> = {
+      'Content-Type': req.get('Content-Type') || 'application/json',
+    };
+
+    for (const header of headersForward) {
+      const value = req.get(header);
+      if (value) {
+        forwardHeaders[header] = value;
+      }
+    }
+
+    const targetResponse = await fetch(proxyUrl.target_url, {
+      method: req.method,
+      headers: forwardHeaders,
+      body: ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body),
+    });
+
+    const targetContentType = targetResponse.headers.get('Content-Type') || 'application/json';
+    const targetBody = await targetResponse.text();
+
+    res.setHeader('Content-Type', targetContentType);
+    res.setHeader('X-Payment-TxHash', settleResult.transactionHash || '');
+
+    res.status(targetResponse.status).send(targetBody);
+
+  } catch (error) {
+    console.error('[Proxy URL] Error:', error);
+    res.status(500).json({
+      error: 'Proxy error',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
 });
 
 export { router as facilitatorRouter };

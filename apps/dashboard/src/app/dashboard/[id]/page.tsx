@@ -42,8 +42,9 @@ import { TransactionsTable } from '@/components/transactions-table';
 import { SettlementActivityChart } from '@/components/settlement-activity-chart';
 import { WebhooksSection } from '@/components/webhooks-section';
 import { PaymentLinksSection } from '@/components/payment-links-section';
+import { UrlsSection } from '@/components/urls-section';
 
-type Tab = 'transactions' | 'payment-links' | 'webhooks' | 'settings';
+type Tab = 'transactions' | 'payment-links' | 'urls' | 'webhooks' | 'settings';
 
 function FaviconImage({ url, favicon, size = 'md' }: { url: string; favicon?: string | null; size?: 'md' | 'lg' }) {
   const [hasError, setHasError] = useState(false);
@@ -430,6 +431,17 @@ export default function FacilitatorDetailPage() {
               Payment Links
             </button>
             <button
+              onClick={() => setActiveTab('urls')}
+              className={cn(
+                'pb-3 text-sm font-medium border-b-2 -mb-px transition-colors',
+                activeTab === 'urls'
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              )}
+            >
+              URLs
+            </button>
+            <button
               onClick={() => setActiveTab('webhooks')}
               className={cn(
                 'pb-3 text-sm font-medium border-b-2 -mb-px transition-colors',
@@ -457,6 +469,8 @@ export default function FacilitatorDetailPage() {
         {/* Tab Content */}
         {activeTab === 'payment-links' ? (
           <PaymentLinksSection facilitatorId={id} facilitator={facilitator} />
+        ) : activeTab === 'urls' ? (
+          <UrlsSection facilitatorId={id} facilitator={facilitator} />
         ) : activeTab === 'webhooks' ? (
           <WebhooksSection facilitatorId={id} facilitator={facilitator} />
         ) : activeTab === 'transactions' ? (

@@ -333,6 +333,28 @@ export function initializeDatabase(dbPath?: string): Database.Database {
     );
 
     CREATE INDEX IF NOT EXISTS idx_pending_facilitators_user ON pending_facilitators(user_id);
+
+    -- Proxy URLs table (API gateway/proxy with x402 payments)
+    CREATE TABLE IF NOT EXISTS proxy_urls (
+      id TEXT PRIMARY KEY,
+      facilitator_id TEXT NOT NULL REFERENCES facilitators(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL,
+      target_url TEXT NOT NULL,
+      method TEXT NOT NULL DEFAULT 'ANY',
+      price_amount TEXT NOT NULL,
+      price_asset TEXT NOT NULL,
+      price_network TEXT NOT NULL,
+      pay_to_address TEXT NOT NULL,
+      headers_forward TEXT NOT NULL DEFAULT '[]',
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(facilitator_id, slug)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_proxy_urls_facilitator ON proxy_urls(facilitator_id);
+    CREATE INDEX IF NOT EXISTS idx_proxy_urls_slug ON proxy_urls(facilitator_id, slug);
   `);
 
   console.log('✅ Database initialized at', databasePath);
@@ -357,5 +379,6 @@ export * from './subscriptions.js';
 export * from './payment-links.js';
 export * from './webhooks.js';
 export * from './pending-facilitators.js';
+export * from './proxy-urls.js';
 export * from './types.js';
 
