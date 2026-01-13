@@ -875,6 +875,44 @@ router.get('/pay/:linkId', async (req: Request, res: Response) => {
     }
   }
 
+  // === Check for valid access cookie (browser flow) ===
+  if (hasValidAccess) {
+    // For proxy type: fetch and return the content directly
+    if (link.link_type === 'proxy' && link.success_redirect_url) {
+      try {
+        const targetResponse = await fetch(link.success_redirect_url, {
+          method: 'GET',
+          headers: { 'Accept': '*/*' },
+        });
+        const targetContentType = targetResponse.headers.get('Content-Type') || 'text/html';
+        const targetBody = await targetResponse.text();
+        res.setHeader('Content-Type', targetContentType);
+        res.status(targetResponse.status).send(targetBody);
+        return;
+      } catch (proxyError) {
+        console.error('[Browser Proxy] Error:', proxyError);
+        // Fall through to payment page on error
+      }
+    }
+    // For redirect type: redirect to success URL
+    if (link.link_type === 'redirect' && link.success_redirect_url) {
+      res.redirect(link.success_redirect_url);
+      return;
+    }
+    // For payment type: show simple "already paid" page
+    if (link.link_type === 'payment') {
+      res.send(`
+        <!DOCTYPE html>
+        <html><head><title>Access Granted</title>
+        <style>body{font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f0fdf4;}
+        .card{background:#fff;padding:48px;border-radius:12px;text-align:center;box-shadow:0 4px 6px rgba(0,0,0,0.1);}
+        h1{color:#16a34a;margin-bottom:16px;}p{color:#666;}</style></head>
+        <body><div class="card"><h1>✓ Access Granted</h1><p>You have already paid for this content.</p></div></body></html>
+      `);
+      return;
+    }
+  }
+
   // === HTML Payment Page ===
   // Set CSP headers for the HTML page
   res.setHeader(
@@ -1268,6 +1306,8 @@ router.get('/pay/:linkId', async (req: Request, res: Response) => {
     const AMOUNT = '${link.amount}';
     const ASSET = '${link.asset}';
     const NETWORK = '${link.network}';
+    const LINK_TYPE = '${link.link_type}';
+    const ACCESS_TTL = ${link.access_ttl || 0};
     const SUCCESS_REDIRECT = ${link.success_redirect_url ? `'${link.success_redirect_url}'` : 'null'};
     const IS_SOLANA = NETWORK === 'solana' || NETWORK === 'solana-devnet' || NETWORK.startsWith('solana:');
 
@@ -1458,7 +1498,13 @@ router.get('/pay/:linkId', async (req: Request, res: Response) => {
 
           showStatus('Payment successful!', 'success');
 
-          if (SUCCESS_REDIRECT) {
+          // For proxy links with access_ttl, reload to show the proxied content
+          if (LINK_TYPE === 'proxy' && ACCESS_TTL > 0) {
+            showStatus('Payment successful! Loading content...', 'success');
+            setTimeout(() => { window.location.reload(); }, 1500);
+          } else if (LINK_TYPE === 'redirect' && SUCCESS_REDIRECT) {
+            setTimeout(() => { window.location.href = SUCCESS_REDIRECT; }, 2000);
+          } else if (SUCCESS_REDIRECT) {
             setTimeout(() => { window.location.href = SUCCESS_REDIRECT; }, 2000);
           }
         } else {
@@ -1662,7 +1708,13 @@ router.get('/pay/:linkId', async (req: Request, res: Response) => {
 
         showStatus('Payment successful!', 'success');
 
-        if (SUCCESS_REDIRECT) {
+        // For proxy links with access_ttl, reload to show the proxied content
+        if (LINK_TYPE === 'proxy' && ACCESS_TTL > 0) {
+          showStatus('Payment successful! Loading content...', 'success');
+          setTimeout(() => { window.location.reload(); }, 1500);
+        } else if (LINK_TYPE === 'redirect' && SUCCESS_REDIRECT) {
+          setTimeout(() => { window.location.href = SUCCESS_REDIRECT; }, 2000);
+        } else if (SUCCESS_REDIRECT) {
           setTimeout(() => { window.location.href = SUCCESS_REDIRECT; }, 2000);
         }
       } catch (err) {
