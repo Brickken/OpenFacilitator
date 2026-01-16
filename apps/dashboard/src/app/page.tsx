@@ -126,7 +126,7 @@ export default function Home() {
               </div>
               <span className="text-xs text-muted-foreground ml-2">example.ts</span>
             </div>
-            <pre className="p-4 text-sm overflow-x-auto font-mono leading-relaxed">
+            <pre className="p-4 text-sm overflow-x-auto font-mono leading-relaxed border-0 bg-transparent">
               <code>
                 <span className="text-[#ff7b72]">import</span>
                 <span className="text-[#c9d1d9]">{" { "}</span>
