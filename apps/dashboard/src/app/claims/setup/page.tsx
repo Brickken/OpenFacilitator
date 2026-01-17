@@ -146,7 +146,8 @@ function ClaimsSetupContent() {
   const [serverName, setServerName] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(false);
-  const [sdkFramework, setSdkFramework] = useState<'hono' | 'express'>('hono');
+  const [sdkFramework, setSdkFramework] = useState<'hono' | 'express' | 'sdk'>('hono');
+  const [processingClaims, setProcessingClaims] = useState<Set<string>>(new Set());
 
   // Check auth on mount
   useEffect(() => {
@@ -341,6 +342,7 @@ function ClaimsSetupContent() {
 
   // Approve claim
   const approveClaim = async (claimId: string) => {
+    setProcessingClaims((prev) => new Set(prev).add(claimId));
     try {
       await apiCall(`/api/resource-owners/${resourceOwner!.id}/claims/${claimId}/approve`, {
         method: 'POST',
@@ -348,11 +350,18 @@ function ClaimsSetupContent() {
       loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to approve claim');
+    } finally {
+      setProcessingClaims((prev) => {
+        const next = new Set(prev);
+        next.delete(claimId);
+        return next;
+      });
     }
   };
 
   // Reject claim
   const rejectClaim = async (claimId: string) => {
+    setProcessingClaims((prev) => new Set(prev).add(claimId));
     try {
       await apiCall(`/api/resource-owners/${resourceOwner!.id}/claims/${claimId}/reject`, {
         method: 'POST',
@@ -360,11 +369,18 @@ function ClaimsSetupContent() {
       loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to reject claim');
+    } finally {
+      setProcessingClaims((prev) => {
+        const next = new Set(prev);
+        next.delete(claimId);
+        return next;
+      });
     }
   };
 
   // Execute payout
   const executePayout = async (claimId: string) => {
+    setProcessingClaims((prev) => new Set(prev).add(claimId));
     try {
       await apiCall(`/api/resource-owners/${resourceOwner!.id}/claims/${claimId}/payout`, {
         method: 'POST',
@@ -372,6 +388,12 @@ function ClaimsSetupContent() {
       loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to execute payout');
+    } finally {
+      setProcessingClaims((prev) => {
+        const next = new Set(prev);
+        next.delete(claimId);
+        return next;
+      });
     }
   };
 
@@ -384,6 +406,18 @@ function ClaimsSetupContent() {
   const formatAmount = (amount: string) => {
     const value = Number(amount) / 1_000_000;
     return `$${value.toFixed(2)}`;
+  };
+
+  const getExplorerUrl = (network: string, txHash: string) => {
+    const explorers: Record<string, string> = {
+      base: 'https://basescan.org/tx/',
+      'base-sepolia': 'https://sepolia.basescan.org/tx/',
+      solana: 'https://solscan.io/tx/',
+      'solana-devnet': 'https://solscan.io/tx/',
+    };
+    const baseUrl = explorers[network] || explorers['base'];
+    const suffix = network === 'solana-devnet' ? '?cluster=devnet' : '';
+    return `${baseUrl}${txHash}${suffix}`;
   };
 
   // Available networks (ones that don't have wallets yet)
@@ -857,6 +891,17 @@ function ClaimsSetupContent() {
                         >
                           Express
                         </button>
+                        <button
+                          onClick={() => setSdkFramework('sdk')}
+                          className={cn(
+                            'px-3 py-1 text-xs font-medium rounded-md transition-colors',
+                            sdkFramework === 'sdk'
+                              ? 'bg-background text-foreground shadow-sm'
+                              : 'text-muted-foreground hover:text-foreground'
+                          )}
+                        >
+                          SDK
+                        </button>
                       </div>
                     </div>
                     <CodeBlock
@@ -874,13 +919,14 @@ app.post('/api/resource', honoPaymentMiddleware({
   }),
   refundProtection: {
     apiKey: process.env.REFUND_API_KEY,
-    facilitatorUrl: '${servers[0]?.url || 'https://api.x402.jobs'}',
+    facilitatorUrl: 'https://api.openfacilitator.io',
   },
 }), async (c) => {
   // Your handler - failures auto-reported
   return c.json({ success: true });
 });`
-                        : `import { createPaymentMiddleware } from '@openfacilitator/sdk';
+                        : sdkFramework === 'express'
+                        ? `import { createPaymentMiddleware } from '@openfacilitator/sdk';
 
 const paymentMiddleware = createPaymentMiddleware({
   facilitator: '${facilitator}',
@@ -893,14 +939,49 @@ const paymentMiddleware = createPaymentMiddleware({
   }),
   refundProtection: {
     apiKey: process.env.REFUND_API_KEY,
-    facilitatorUrl: '${servers[0]?.url || 'https://api.x402.jobs'}',
+    facilitatorUrl: 'https://api.openfacilitator.io',
   },
 });
 
 app.post('/api/resource', paymentMiddleware, async (req, res) => {
   // Your handler - failures auto-reported
   res.json({ success: true });
-});`}
+});`
+                        : `import { OpenFacilitator, reportFailure } from '@openfacilitator/sdk';
+
+const facilitator = new OpenFacilitator({
+  url: 'https://${facilitator}'
+});
+
+// In your handler after payment settles:
+async function handleRequest(paymentPayload, requirements) {
+  // Verify and settle payment
+  const result = await facilitator.settle(paymentPayload, requirements);
+
+  if (!result.success) {
+    throw new Error(result.errorReason);
+  }
+
+  try {
+    // Your business logic here
+    await doSomethingThatMightFail();
+    return { success: true };
+  } catch (error) {
+    // Report failure for refund
+    await reportFailure({
+      facilitatorUrl: 'https://api.openfacilitator.io',
+      apiKey: process.env.REFUND_API_KEY,
+      originalTxHash: result.transaction,
+      userWallet: result.payer,
+      amount: requirements.maxAmountRequired,
+      asset: requirements.asset,
+      network: requirements.network,
+      reason: error.message,
+    });
+
+    throw error;
+  }
+}`}
                       language="typescript"
                     />
                   </div>
@@ -982,20 +1063,38 @@ app.post('/api/resource', paymentMiddleware, async (req, res) => {
                               <Badge variant="outline" className="capitalize">{claim.network}</Badge>
                               <span className="text-lg font-semibold">{formatAmount(claim.amount)}</span>
                             </div>
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                            <div className="space-y-1 text-sm">
                               <div>
                                 <span className="text-muted-foreground">User:</span>{' '}
                                 <code className="font-mono text-xs">{formatAddress(claim.userWallet)}</code>
                               </div>
-                              <div>
-                                <span className="text-muted-foreground">Tx:</span>{' '}
-                                <code className="font-mono text-xs">{formatAddress(claim.originalTxHash)}</code>
-                              </div>
                               {claim.reason && (
-                                <div className="col-span-2">
+                                <div>
                                   <span className="text-muted-foreground">Reason:</span> {claim.reason}
                                 </div>
                               )}
+                              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs pt-1">
+                                <a
+                                  href={getExplorerUrl(claim.network, claim.originalTxHash)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                                >
+                                  Original: <code className="font-mono">{formatAddress(claim.originalTxHash)}</code>
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                                {claim.status === 'paid' && claim.payoutTxHash && (
+                                  <a
+                                    href={getExplorerUrl(claim.network, claim.payoutTxHash)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-green-600 hover:text-green-700 inline-flex items-center gap-1"
+                                  >
+                                    Refund: <code className="font-mono">{formatAddress(claim.payoutTxHash)}</code>
+                                    <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                )}
+                              </div>
                             </div>
                           </div>
                           <div className="flex gap-2 flex-shrink-0">

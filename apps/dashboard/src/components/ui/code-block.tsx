@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { Highlight, themes } from 'prism-react-renderer';
 
 interface CodeBlockProps {
   code: string;
@@ -26,11 +27,37 @@ export function CodeBlock({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Map common language names to prism languages
+  const prismLanguage = language === 'bash' || language === 'shell' ? 'bash' :
+                        language === 'ts' ? 'typescript' :
+                        language === 'js' ? 'javascript' :
+                        language;
+
   return (
     <div className={cn("relative", className)}>
-      <pre className="bg-zinc-900 text-zinc-100 rounded-lg p-3 pr-12 overflow-x-auto text-[13px] font-mono leading-relaxed border border-zinc-800">
-        <code>{code.trim()}</code>
-      </pre>
+      <Highlight
+        theme={themes.nightOwl}
+        code={code.trim()}
+        language={prismLanguage as 'typescript' | 'javascript' | 'bash'}
+      >
+        {({ className: preClassName, style, tokens, getLineProps, getTokenProps }) => (
+          <pre
+            className={cn(
+              preClassName,
+              "rounded-lg p-4 pr-12 overflow-x-auto text-[13px] font-mono leading-relaxed border border-zinc-800"
+            )}
+            style={{ ...style, backgroundColor: '#0d1117' }}
+          >
+            {tokens.map((line, i) => (
+              <div key={i} {...getLineProps({ line })}>
+                {line.map((token, key) => (
+                  <span key={key} {...getTokenProps({ token })} />
+                ))}
+              </div>
+            ))}
+          </pre>
+        )}
+      </Highlight>
       {showCopy && (
         <Button
           variant="ghost"
