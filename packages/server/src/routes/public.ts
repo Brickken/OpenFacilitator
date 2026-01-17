@@ -376,6 +376,159 @@ router.get('/free/info', (_req: Request, res: Response) => {
 });
 
 // ============================================
+// DEMO ENDPOINT (for testing refund protection)
+// ============================================
+
+/**
+ * Demo x402 resource that randomly fails ~50% of the time.
+ * Used to test refund protection flow.
+ *
+ * GET /demo/unreliable - Returns 402 with payment requirements
+ * POST /demo/unreliable - Process payment and randomly fail
+ */
+router.get('/demo/unreliable', (_req: Request, res: Response) => {
+  // Return 402 with payment requirements
+  const requirements = {
+    scheme: 'exact',
+    network: 'base',
+    maxAmountRequired: '100000', // 0.10 USDC
+    asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+    payTo: process.env.FREE_FACILITATOR_EVM_ADDRESS || '0x0000000000000000000000000000000000000000',
+    resource: 'https://api.openfacilitator.io/demo/unreliable',
+    description: 'Demo endpoint that randomly fails ~50% of the time (for testing refund protection)',
+  };
+
+  res.status(402).json({
+    error: 'Payment Required',
+    accepts: [requirements],
+    x402Version: 1,
+  });
+});
+
+router.post('/demo/unreliable', async (req: Request, res: Response) => {
+  try {
+    const facilitatorData = getFreeFacilitatorConfig();
+    if (!facilitatorData) {
+      res.status(503).json({ success: false, error: 'Free facilitator not configured' });
+      return;
+    }
+
+    // Get payment from header
+    const paymentHeader = req.headers['x-payment'] as string;
+    if (!paymentHeader) {
+      res.status(402).json({
+        error: 'Payment Required',
+        accepts: [{
+          scheme: 'exact',
+          network: 'base',
+          maxAmountRequired: '100000',
+          asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+          payTo: process.env.FREE_FACILITATOR_EVM_ADDRESS || '0x0000000000000000000000000000000000000000',
+          resource: 'https://api.openfacilitator.io/demo/unreliable',
+          description: 'Demo endpoint that randomly fails ~50% of the time',
+        }],
+        x402Version: 1,
+      });
+      return;
+    }
+
+    // Parse payment payload
+    let paymentPayload: string;
+    try {
+      paymentPayload = paymentHeader;
+    } catch {
+      res.status(400).json({ success: false, error: 'Invalid payment header' });
+      return;
+    }
+
+    const paymentRequirements = {
+      scheme: 'exact',
+      network: 'base',
+      maxAmountRequired: '100000',
+      asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+      payTo: process.env.FREE_FACILITATOR_EVM_ADDRESS || '0x0000000000000000000000000000000000000000',
+      resource: 'https://api.openfacilitator.io/demo/unreliable',
+    };
+
+    // Verify payment
+    const facilitator = createFacilitator(facilitatorData.config);
+    const verifyResult = await facilitator.verify(paymentPayload, paymentRequirements);
+
+    if (!verifyResult.isValid) {
+      res.status(402).json({
+        success: false,
+        error: 'Payment verification failed',
+        reason: verifyResult.invalidReason,
+      });
+      return;
+    }
+
+    // Settle payment
+    if (!facilitatorData.evmPrivateKey) {
+      res.status(503).json({ success: false, error: 'EVM not configured on free facilitator' });
+      return;
+    }
+    const settleResult = await facilitator.settle(paymentPayload, paymentRequirements, facilitatorData.evmPrivateKey);
+
+    if (!settleResult.success) {
+      res.status(500).json({
+        success: false,
+        error: 'Payment settlement failed',
+        reason: settleResult.errorReason,
+      });
+      return;
+    }
+
+    // Log the transaction
+    createTransaction({
+      facilitator_id: 'free-facilitator',
+      type: 'settle',
+      network: paymentRequirements.network,
+      from_address: settleResult.payer || 'unknown',
+      to_address: paymentRequirements.payTo,
+      amount: paymentRequirements.maxAmountRequired,
+      asset: paymentRequirements.asset,
+      status: 'success',
+      transaction_hash: settleResult.transaction,
+    });
+
+    // RANDOMLY FAIL ~50% of the time
+    const shouldFail = Math.random() < 0.5;
+
+    if (shouldFail) {
+      // Return failure response with refund info
+      res.status(500).json({
+        success: false,
+        error: 'Simulated random failure',
+        message: 'This endpoint randomly fails to demonstrate refund protection.',
+        refundEligible: true,
+        transactionHash: settleResult.transaction,
+        payer: settleResult.payer,
+        amount: paymentRequirements.maxAmountRequired,
+        asset: paymentRequirements.asset,
+        network: paymentRequirements.network,
+        note: 'If you have set up refund protection with the SDK middleware, this failure would have been automatically reported for a refund.',
+      });
+      return;
+    }
+
+    // Success!
+    res.json({
+      success: true,
+      message: 'You got lucky! The unreliable endpoint succeeded this time.',
+      transactionHash: settleResult.transaction,
+      payer: settleResult.payer,
+    });
+  } catch (error) {
+    console.error('Demo unreliable endpoint error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+    });
+  }
+});
+
+// ============================================
 // CLAIMS ENDPOINTS (for SDK and users)
 // ============================================
 

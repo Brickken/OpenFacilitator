@@ -17,7 +17,36 @@ interface SDKIntegrationProps {
 }
 
 export function SDKIntegration({ facilitator, serverUrl = 'https://api.x402.jobs' }: SDKIntegrationProps) {
-  const [sdkFramework, setSdkFramework] = useState<'hono' | 'express'>('hono');
+  const [sdkFramework, setSdkFramework] = useState<'sdk' | 'hono' | 'express'>('sdk');
+
+  const sdkCode = `import { OpenFacilitator, reportFailure } from '@openfacilitator/sdk';
+
+const facilitator = new OpenFacilitator('${facilitator}');
+
+const requirements = {
+  scheme: 'exact',
+  network: 'base',
+  maxAmountRequired: '1000000',
+  asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+  payTo: '0xYourAddress',
+};
+
+const { isValid } = await facilitator.verify(payment, requirements);
+const { transaction } = await facilitator.settle(payment, requirements);
+
+// On failure, report for refund
+if (handlerFailed) {
+  await reportFailure({
+    facilitatorUrl: '${serverUrl}',
+    apiKey: process.env.REFUND_API_KEY,
+    originalTxHash: transaction.hash,
+    userWallet: payment.payload.authorization.from,
+    amount: requirements.maxAmountRequired,
+    asset: requirements.asset,
+    network: requirements.network,
+    reason: 'Handler failed',
+  });
+}`;
 
   const honoCode = `import { honoPaymentMiddleware } from '@openfacilitator/sdk';
 
@@ -61,7 +90,7 @@ app.post('/api/resource', paymentMiddleware, async (req, res) => {
   res.json({ success: true });
 });`;
 
-  const currentCode = sdkFramework === 'hono' ? honoCode : expressCode;
+  const currentCode = sdkFramework === 'sdk' ? sdkCode : sdkFramework === 'hono' ? honoCode : expressCode;
 
   return (
     <Card>
@@ -90,6 +119,17 @@ app.post('/api/resource', paymentMiddleware, async (req, res) => {
               Add to your API handler
             </Label>
             <div className="flex gap-1 bg-muted/50 rounded-lg p-1">
+              <button
+                onClick={() => setSdkFramework('sdk')}
+                className={cn(
+                  'px-3 py-1 text-xs font-medium rounded-md transition-colors',
+                  sdkFramework === 'sdk'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                SDK
+              </button>
               <button
                 onClick={() => setSdkFramework('hono')}
                 className={cn(

@@ -37,6 +37,8 @@ function GetStartedButton({ className }: { className?: string }) {
 }
 
 export default function Home() {
+  const [codeTab, setCodeTab] = useState<'sdk' | 'hono' | 'express'>('sdk');
+
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -129,53 +131,113 @@ export default function Home() {
             <ArrowRight className="w-3 h-3 opacity-0 -ml-1 group-hover:opacity-100 group-hover:ml-0 transition-all" />
           </Link>
 
-          {/* Quick code example */}
+          {/* Quick code example with tabs */}
           <div className="mt-6 rounded-xl bg-[#0d1117] overflow-hidden">
-            <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-[#161b22]">
-              <div className="flex gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-[#ff5f56]"></div>
-                <div className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]"></div>
-                <div className="w-2.5 h-2.5 rounded-full bg-[#27ca40]"></div>
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border/50 bg-[#161b22]">
+              <div className="flex items-center gap-2">
+                <div className="flex gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#ff5f56]"></div>
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]"></div>
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#27ca40]"></div>
+                </div>
+                <span className="text-xs text-muted-foreground ml-2">
+                  {codeTab === 'sdk' ? 'example.ts' : codeTab === 'hono' ? 'server.ts' : 'server.ts'}
+                </span>
               </div>
-              <span className="text-xs text-muted-foreground ml-2">example.ts</span>
+              <div className="flex gap-1 bg-[#0d1117] rounded-md p-0.5">
+                <button
+                  onClick={() => setCodeTab('sdk')}
+                  className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                    codeTab === 'sdk'
+                      ? 'bg-[#30363d] text-[#c9d1d9]'
+                      : 'text-[#8b949e] hover:text-[#c9d1d9]'
+                  }`}
+                >
+                  SDK
+                </button>
+                <button
+                  onClick={() => setCodeTab('hono')}
+                  className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                    codeTab === 'hono'
+                      ? 'bg-[#30363d] text-[#c9d1d9]'
+                      : 'text-[#8b949e] hover:text-[#c9d1d9]'
+                  }`}
+                >
+                  Hono
+                </button>
+                <button
+                  onClick={() => setCodeTab('express')}
+                  className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                    codeTab === 'express'
+                      ? 'bg-[#30363d] text-[#c9d1d9]'
+                      : 'text-[#8b949e] hover:text-[#c9d1d9]'
+                  }`}
+                >
+                  Express
+                </button>
+              </div>
             </div>
             <pre className="p-4 text-sm overflow-x-auto font-mono leading-relaxed border-0 bg-transparent">
-              <code>
-                <span className="text-[#ff7b72]">import</span>
-                <span className="text-[#c9d1d9]">{" { "}</span>
-                <span className="text-[#ffa657]">OpenFacilitator</span>
-                <span className="text-[#c9d1d9]">{" } "}</span>
-                <span className="text-[#ff7b72]">from</span>
-                <span className="text-[#a5d6ff]">{" '@openfacilitator/sdk'"}</span>
-                <span className="text-[#c9d1d9]">;</span>
-                {"\n\n"}
-                <span className="text-[#ff7b72]">const</span>
-                <span className="text-[#c9d1d9]"> facilitator = </span>
-                <span className="text-[#ff7b72]">new</span>
-                <span className="text-[#ffa657]"> OpenFacilitator</span>
-                <span className="text-[#c9d1d9]">();</span>
-                {"\n\n"}
-                <span className="text-[#ff7b72]">const</span>
-                <span className="text-[#c9d1d9]">{" requirements = { scheme, network, maxAmountRequired, asset, payTo };"}</span>
-                {"\n\n"}
-                <span className="text-[#ff7b72]">const</span>
-                <span className="text-[#c9d1d9]">{" { "}</span>
-                <span className="text-[#c9d1d9]">isValid</span>
-                <span className="text-[#c9d1d9]">{" } = "}</span>
-                <span className="text-[#ff7b72]">await</span>
-                <span className="text-[#c9d1d9]"> facilitator.</span>
-                <span className="text-[#d2a8ff]">verify</span>
-                <span className="text-[#c9d1d9]">(payment, requirements);</span>
-                {"\n"}
-                <span className="text-[#ff7b72]">const</span>
-                <span className="text-[#c9d1d9]">{" { "}</span>
-                <span className="text-[#c9d1d9]">transaction</span>
-                <span className="text-[#c9d1d9]">{" } = "}</span>
-                <span className="text-[#ff7b72]">await</span>
-                <span className="text-[#c9d1d9]"> facilitator.</span>
-                <span className="text-[#d2a8ff]">settle</span>
-                <span className="text-[#c9d1d9]">(payment, requirements);</span>
-              </code>
+              {codeTab === 'hono' && (
+                <code className="text-[#c9d1d9]">
+                  <span className="text-[#ff7b72]">import</span>{" { "}
+                  <span className="text-[#ffa657]">honoPaymentMiddleware</span>{" } "}
+                  <span className="text-[#ff7b72]">from</span>
+                  <span className="text-[#a5d6ff]">{" '@openfacilitator/sdk'"}</span>;
+                  {"\n\n"}
+                  app.<span className="text-[#d2a8ff]">post</span>(<span className="text-[#a5d6ff]">'/api/resource'</span>, <span className="text-[#d2a8ff]">honoPaymentMiddleware</span>({"{"}
+                  {"\n"}  <span className="text-[#d2a8ff]">getRequirements</span>: () {"=>"} ({"{"}
+                  {"\n"}    scheme: <span className="text-[#a5d6ff]">'exact'</span>,
+                  {"\n"}    network: <span className="text-[#a5d6ff]">'base'</span>,
+                  {"\n"}    maxAmountRequired: <span className="text-[#a5d6ff]">'1000000'</span>,
+                  {"\n"}    asset: <span className="text-[#a5d6ff]">'0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'</span>,
+                  {"\n"}    payTo: <span className="text-[#a5d6ff]">'0xYourAddress'</span>,
+                  {"\n"}  {"}"}),
+                  {"\n"}{"}"}), <span className="text-[#ff7b72]">async</span> (c) {"=>"} {"{"}
+                  {"\n"}  <span className="text-[#8b949e]">{"// Payment verified & settled automatically"}</span>
+                  {"\n"}  <span className="text-[#ff7b72]">return</span> c.<span className="text-[#d2a8ff]">json</span>({"{"} success: <span className="text-[#79c0ff]">true</span> {"}"});
+                  {"\n"}{"}"});
+                </code>
+              )}
+              {codeTab === 'express' && (
+                <code className="text-[#c9d1d9]">
+                  <span className="text-[#ff7b72]">import</span>{" { "}
+                  <span className="text-[#ffa657]">createPaymentMiddleware</span>{" } "}
+                  <span className="text-[#ff7b72]">from</span>
+                  <span className="text-[#a5d6ff]">{" '@openfacilitator/sdk'"}</span>;
+                  {"\n\n"}
+                  <span className="text-[#ff7b72]">const</span> paymentMiddleware = <span className="text-[#d2a8ff]">createPaymentMiddleware</span>({"{"}
+                  {"\n"}  <span className="text-[#d2a8ff]">getRequirements</span>: () {"=>"} ({"{"}
+                  {"\n"}    scheme: <span className="text-[#a5d6ff]">'exact'</span>,
+                  {"\n"}    network: <span className="text-[#a5d6ff]">'base'</span>,
+                  {"\n"}    maxAmountRequired: <span className="text-[#a5d6ff]">'1000000'</span>,
+                  {"\n"}    asset: <span className="text-[#a5d6ff]">'0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'</span>,
+                  {"\n"}    payTo: <span className="text-[#a5d6ff]">'0xYourAddress'</span>,
+                  {"\n"}  {"}"}),
+                  {"\n"}{"}"});
+                  {"\n\n"}
+                  app.<span className="text-[#d2a8ff]">post</span>(<span className="text-[#a5d6ff]">'/api/resource'</span>, paymentMiddleware, <span className="text-[#ff7b72]">async</span> (req, res) {"=>"} {"{"}
+                  {"\n"}  <span className="text-[#8b949e]">{"// Payment verified & settled automatically"}</span>
+                  {"\n"}  res.<span className="text-[#d2a8ff]">json</span>({"{"} success: <span className="text-[#79c0ff]">true</span> {"}"});
+                  {"\n"}{"}"});
+                </code>
+              )}
+              {codeTab === 'sdk' && (
+                <code className="text-[#c9d1d9]">
+                  <span className="text-[#ff7b72]">import</span>{" { "}
+                  <span className="text-[#ffa657]">OpenFacilitator</span>{" } "}
+                  <span className="text-[#ff7b72]">from</span>
+                  <span className="text-[#a5d6ff]">{" '@openfacilitator/sdk'"}</span>;
+                  {"\n\n"}
+                  <span className="text-[#ff7b72]">const</span> facilitator = <span className="text-[#ff7b72]">new</span> <span className="text-[#ffa657]">OpenFacilitator</span>();
+                  {"\n\n"}
+                  <span className="text-[#ff7b72]">const</span> requirements = {"{"} scheme, network, maxAmountRequired, asset, payTo {"}"};
+                  {"\n\n"}
+                  <span className="text-[#ff7b72]">const</span> {"{"} isValid {"}"} = <span className="text-[#ff7b72]">await</span> facilitator.<span className="text-[#d2a8ff]">verify</span>(payment, requirements);
+                  {"\n"}
+                  <span className="text-[#ff7b72]">const</span> {"{"} transaction {"}"} = <span className="text-[#ff7b72]">await</span> facilitator.<span className="text-[#d2a8ff]">settle</span>(payment, requirements);
+                </code>
+              )}
             </pre>
           </div>
 
@@ -311,8 +373,28 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Discovery */}
+      {/* Refund Protection */}
       <section className="py-20 px-6 bg-secondary/30">
+        <div className="max-w-4xl mx-auto text-center">
+          <ShieldCheck className="w-12 h-12 text-primary mx-auto mb-6" />
+          <h2 className="text-3xl font-bold mb-4">
+            Stand out with refund protection
+          </h2>
+          <p className="text-muted-foreground mb-8 max-w-2xl mx-auto text-balance">
+            Differentiate yourself in the x402 ecosystem. When your API fails after payment, automatically refund your users. Build trust and reduce support burden.
+          </p>
+          <Link
+            href="/claims/setup?facilitator=pay.openfacilitator.io"
+            className="inline-flex items-center gap-2 text-primary hover:underline font-medium"
+          >
+            Set up refund protection
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      </section>
+
+      {/* Discovery */}
+      <section className="py-20 px-6">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-3xl font-bold text-center mb-4">
             x402 Discovery Built In
