@@ -211,10 +211,15 @@ router.get('/stats/base', (req: Request, res: Response) => {
 /**
  * GET /stats - Redirect to available endpoints
  */
-router.get('/stats', (_req: Request, res: Response) => {
+router.get('/stats', async (_req: Request, res: Response) => {
+  const [solanaReq, baseReq] = await Promise.all([
+    getRequirements('solana'),
+    getRequirements('base'),
+  ]);
+
   res.status(402).json({
     x402Version: 2,
-    accepts: [REQUIREMENTS.solana, REQUIREMENTS.base],
+    accepts: [solanaReq, baseReq],
     error: 'Payment Required',
     message: 'Use /stats/solana or /stats/base for network-specific endpoints',
     endpoints: {
