@@ -5,7 +5,7 @@
  * GET /stats/base - Stats via Base payment ($5 USDC)
  */
 import { Router, type Request, type Response, type IRouter } from 'express';
-import { OpenFacilitator, type PaymentPayload, type PaymentRequirements } from '@openfacilitator/sdk';
+import { OpenFacilitator, createPaymentMiddleware, type PaymentRequirements } from '@openfacilitator/sdk';
 import { getGlobalStats } from '../db/transactions.js';
 
 const router: IRouter = Router();
@@ -103,123 +103,76 @@ const BASE_REQUIREMENTS = {
 };
 
 // Get requirements with feePayer from facilitator SDK
-async function getRequirements(network: 'solana' | 'base') {
+async function getRequirements(network: 'solana' | 'base'): Promise<PaymentRequirements> {
   const baseReq = BASE_REQUIREMENTS[network];
   const feePayer = await facilitator.getFeePayer(baseReq.network);
 
   return {
     ...baseReq,
     extra: feePayer ? { feePayer } : undefined,
-  };
+  } as PaymentRequirements;
 }
 
-/**
- * Shared handler for stats endpoints
- */
-async function handleStatsRequest(
-  req: Request,
-  res: Response,
-  network: 'solana' | 'base'
-) {
-  const paymentHeader = req.header('X-PAYMENT');
-  const requirement = await getRequirements(network);
+// Get all requirements for multi-network 402 response
+async function getAllRequirements(): Promise<PaymentRequirements[]> {
+  const [solana, base] = await Promise.all([
+    getRequirements('solana'),
+    getRequirements('base'),
+  ]);
+  return [solana, base];
+}
 
-  // If no payment provided, return 402 with requirements
-  if (!paymentHeader) {
-    res.status(402).json({
-      x402Version: 2,
-      accepts: [requirement],
-      error: 'Payment Required',
-      message: `This endpoint requires a $5 USDC payment via x402 (${network})`,
-    });
-    return;
-  }
+// Create middleware with refund protection if API key is configured
+const statsPaymentMiddleware = createPaymentMiddleware({
+  facilitator,
+  getRequirements: getAllRequirements,
+  refundProtection: process.env.DEMO_REFUND_API_KEY ? {
+    apiKey: process.env.DEMO_REFUND_API_KEY,
+    facilitatorUrl: API_URL,
+  } : undefined,
+});
 
-  try {
-    // Decode payment payload
-    let paymentPayload: PaymentPayload;
-    try {
-      const decoded = Buffer.from(paymentHeader, 'base64').toString('utf-8');
-      paymentPayload = JSON.parse(decoded);
-    } catch {
-      res.status(400).json({
-        error: 'Invalid payment payload',
-        message: 'Could not decode X-PAYMENT header',
-      });
-      return;
-    }
+// Handler for stats requests (called after middleware)
+function handleStatsSuccess(req: Request, res: Response) {
+  const paymentContext = (req as { paymentContext?: { transactionHash: string } }).paymentContext;
+  const stats = getGlobalStats();
 
-    // Verify payment
-    const verifyResult = await facilitator.verify(paymentPayload, requirement as PaymentRequirements);
-
-    if (!verifyResult.isValid) {
-      res.status(402).json({
-        error: 'Payment verification failed',
-        reason: verifyResult.invalidReason || 'Unknown verification error',
-        accepts: [requirement],
-      });
-      return;
-    }
-
-    // Settle payment
-    console.log('[Stats] Settling payment to:', FACILITATOR_URL);
-    const settleResult = await facilitator.settle(paymentPayload, requirement as PaymentRequirements);
-    console.log('[Stats] Settlement result:', JSON.stringify(settleResult, null, 2));
-
-    if (!settleResult.success) {
-      console.error('[Stats] Settlement FAILED:', settleResult.errorReason);
-      res.status(402).json({
-        error: 'Payment settlement failed',
-        reason: settleResult.errorReason || 'Unknown settlement error',
-        accepts: [requirement],
-      });
-      return;
-    }
-
-    // Payment successful - return stats
-    const stats = getGlobalStats();
-
-    res.json({
-      success: true,
-      paymentTxHash: settleResult.transaction,
-      timestamp: new Date().toISOString(),
-      stats,
-    });
-  } catch (error) {
-    console.error('[Stats] Error processing request:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
+  res.json({
+    success: true,
+    paymentTxHash: paymentContext?.transactionHash,
+    timestamp: new Date().toISOString(),
+    stats,
+  });
 }
 
 /**
  * GET /stats/solana - Platform statistics (Solana payment)
  */
-router.get('/stats/solana', (req: Request, res: Response) => {
-  handleStatsRequest(req, res, 'solana');
-});
+router.get('/stats/solana', statsPaymentMiddleware, handleStatsSuccess);
 
 /**
  * GET /stats/base - Platform statistics (Base payment)
  */
-router.get('/stats/base', (req: Request, res: Response) => {
-  handleStatsRequest(req, res, 'base');
-});
+router.get('/stats/base', statsPaymentMiddleware, handleStatsSuccess);
 
 /**
- * GET /stats - Redirect to available endpoints
+ * GET /stats - Show available endpoints with payment requirements
  */
 router.get('/stats', async (_req: Request, res: Response) => {
-  const [solanaReq, baseReq] = await Promise.all([
-    getRequirements('solana'),
-    getRequirements('base'),
-  ]);
+  const requirements = await getAllRequirements();
+
+  // Add supportsRefunds if refund protection is configured
+  const accepts = requirements.map((req) => ({
+    ...req,
+    extra: {
+      ...req.extra,
+      ...(process.env.DEMO_REFUND_API_KEY ? { supportsRefunds: true } : {}),
+    },
+  }));
 
   res.status(402).json({
     x402Version: 2,
-    accepts: [solanaReq, baseReq],
+    accepts,
     error: 'Payment Required',
     message: 'Use /stats/solana or /stats/base for network-specific endpoints',
     endpoints: {

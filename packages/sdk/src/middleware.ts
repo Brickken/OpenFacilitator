@@ -407,6 +407,7 @@ export function createPaymentMiddleware(config: PaymentMiddlewareConfig) {
           });
 
           res.status(402).json({
+            x402Version: 2,
             error: 'Payment Required',
             accepts,
           });
@@ -589,6 +590,7 @@ export function honoPaymentMiddleware(config: HonoPaymentConfig) {
       });
 
       return c.json({
+        x402Version: 2,
         error: 'Payment Required',
         accepts,
       }, 402);

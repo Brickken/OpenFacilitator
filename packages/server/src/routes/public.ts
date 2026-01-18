@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { createTransaction, updateTransactionStatus } from '../db/transactions.js';
 import { getClaimableByUserWallet, getClaimsByUserWallet, getClaimById, getClaimsByResourceOwner, getClaimStats } from '../db/claims.js';
 import { getFacilitatorById, getFacilitatorByDomainOrSubdomain } from '../db/facilitators.js';
-import { getOrCreateResourceOwner, getResourceOwnerById, getResourceOwnerByUserId } from '../db/resource-owners.js';
+import { getOrCreateResourceOwner, getResourceOwnerById, getResourceOwnerByUserId, getResourceOwnersByFacilitator } from '../db/resource-owners.js';
 import { getRefundWalletsByResourceOwner, getRefundWallet, hasRefundWallet } from '../db/refund-wallets.js';
 import { createRegisteredServer, getRegisteredServersByResourceOwner, deleteRegisteredServer, regenerateServerApiKey, getRegisteredServerById, updateRegisteredServer } from '../db/registered-servers.js';
 import { getOrCreateRefundConfig } from '../db/refund-configs.js';
@@ -147,9 +147,23 @@ router.get('/free/supported', (_req: Request, res: Response) => {
   const signers: Record<string, string[]> = {};
   const evmAddress = process.env.FREE_FACILITATOR_EVM_ADDRESS;
 
-  // Add EVM signer if configured
+  // Add EVM signer and feePayer if configured
   if (evmAddress) {
     signers['eip155:*'] = [evmAddress];
+
+    // Add feePayer to EVM kinds
+    supported.kinds = supported.kinds.map(kind => {
+      if (kind.network.startsWith('eip155:')) {
+        return {
+          ...kind,
+          extra: {
+            ...kind.extra,
+            feePayer: evmAddress,
+          },
+        };
+      }
+      return kind;
+    });
   }
 
   // Add feePayer for Solana if configured
@@ -1237,6 +1251,93 @@ router.get('/api/resource-owners/:resourceOwnerId/stats', requireAuth, async (re
   } catch (error) {
     console.error('Get stats error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ============================================
+// Verification API
+// ============================================
+
+/**
+ * GET /api/verify - Verify if a facilitator supports refunds
+ *
+ * Query params:
+ * - facilitator: subdomain or custom domain of the facilitator
+ *
+ * Response:
+ * {
+ *   verified: boolean,
+ *   supportsRefunds: boolean,
+ *   facilitator: string,
+ *   facilitatorName: string,
+ *   badgeUrl: string
+ * }
+ */
+router.get('/api/verify', async (req: Request, res: Response) => {
+  try {
+    const { facilitator: facilitatorId } = req.query;
+
+    if (!facilitatorId || typeof facilitatorId !== 'string') {
+      res.status(400).json({
+        verified: false,
+        supportsRefunds: false,
+        error: 'Missing facilitator parameter',
+      });
+      return;
+    }
+
+    // Look up facilitator by subdomain or custom domain
+    const facilitator = getFacilitatorByDomainOrSubdomain(facilitatorId);
+
+    if (!facilitator) {
+      res.status(404).json({
+        verified: false,
+        supportsRefunds: false,
+        error: 'Facilitator not found',
+      });
+      return;
+    }
+
+    // Check if refund protection is enabled
+    // A facilitator supports refunds if any resource owner has:
+    // 1. Refund config enabled
+    // 2. At least one refund wallet
+    // 3. At least one API key for reporting failures
+
+    const resourceOwners = getResourceOwnersByFacilitator(facilitator.id);
+    let supportsRefunds = false;
+
+    for (const resourceOwner of resourceOwners) {
+      const refundConfig = getOrCreateRefundConfig(resourceOwner.id);
+      const wallets = getRefundWalletsByResourceOwner(resourceOwner.id);
+      const servers = getRegisteredServersByResourceOwner(resourceOwner.id);
+
+      // Has refunds if: config enabled + at least one wallet + at least one API key
+      if (refundConfig.enabled === 1 && wallets.length > 0 && servers.some(s => s.active === 1)) {
+        supportsRefunds = true;
+        break;
+      }
+    }
+
+    const baseUrl = process.env.DASHBOARD_URL || 'https://openfacilitator.io';
+
+    res.json({
+      verified: true,
+      supportsRefunds,
+      facilitator: facilitator.subdomain,
+      facilitatorName: facilitator.name,
+      badgeUrl: supportsRefunds
+        ? `${baseUrl}/badges/refund-protected.svg`
+        : null,
+      verifyUrl: `${baseUrl}/verify?facilitator=${facilitator.subdomain}`,
+    });
+  } catch (error) {
+    console.error('Verify error:', error);
+    res.status(500).json({
+      verified: false,
+      supportsRefunds: false,
+      error: 'Internal server error',
+    });
   }
 });
 
