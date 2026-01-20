@@ -22,7 +22,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 8: Rewards Dashboard** - Progress display, threshold tracking, estimates
 - [x] **Phase 9: Wallet Connection** - Connect claiming wallets (Solana/EVM) for token receipt
 - [x] **Phase 10: Claims Engine** - Token distribution, SPL transfers, claim history
-- [ ] **Phase 11: Dashboard Integration** - Landing page, navigation, polished UI flows
+- [x] **Phase 11: Dashboard Integration** - Landing page, navigation, polished UI flows
 
 ## Phase Details
 
@@ -187,8 +187,8 @@ Plans:
 
 Plans:
 - [x] 11-01-PLAN.md — Navigation foundation: Tabs UI component, Rewards link in WalletDropdown with claimable badge
-- [ ] 11-02-PLAN.md — Landing page for non-enrolled users, tabbed dashboard container for enrolled users
-- [ ] 11-03-PLAN.md — Tab content components (Progress, Addresses, History) wired into dashboard
+- [x] 11-02-PLAN.md — Landing page for non-enrolled users, tabbed dashboard container for enrolled users
+- [x] 11-03-PLAN.md — Tab content components (Progress, Addresses, History) wired into dashboard
 
 ## Progress
 
@@ -207,7 +207,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 8. Rewards Dashboard | 1/1 | Complete | 2026-01-20 |
 | 9. Wallet Connection | 1/1 | Complete | 2026-01-20 |
 | 10. Claims Engine | 3/3 | Complete | 2026-01-20 |
-| 11. Dashboard Integration | 1/3 | In progress | - |
+| 11. Dashboard Integration | 3/3 | Complete | 2026-01-20 |
 
 ---
 *Roadmap created: 2026-01-19*
