@@ -728,3 +728,4 @@ export * from './reward-addresses.js';
 export * from './campaigns.js';
 export * from './reward-claims.js';
 export * from './volume-snapshots.js';
+export * from './volume-aggregation.js';
