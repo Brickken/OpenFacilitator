@@ -113,9 +113,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ADDR-02 | Phase 4 | Complete |
 | ADDR-03 | Phase 3 | Complete |
 | ADDR-04 | Phase 4 | Complete |
-| ADDR-05 | Phase 5 | Pending |
-| ADDR-06 | Phase 5 | Pending |
-| ADDR-07 | Phase 5 | Pending |
+| ADDR-05 | Phase 5 | Complete |
+| ADDR-06 | Phase 5 | Complete |
+| ADDR-07 | Phase 5 | Complete |
 | VOL-01 | Phase 6 | Pending |
 | VOL-02 | Phase 6 | Pending |
 | VOL-03 | Phase 6 | Pending |

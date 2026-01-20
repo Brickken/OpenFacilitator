@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Auth Integration** - Link rewards accounts to Better Auth, admin identification
 - [x] **Phase 3: Solana Address Management** - Add and verify Solana pay-to addresses
 - [x] **Phase 4: EVM Address Management** - Add and verify EVM pay-to addresses
-- [ ] **Phase 5: Address UI** - List, remove, and manage multiple tracked addresses
+- [x] **Phase 5: Address UI** - List, remove, and manage multiple tracked addresses
 - [ ] **Phase 6: Volume Tracking Engine** - Aggregate volume from transactions, exclude self-transfers
 - [ ] **Phase 7: Campaign System** - Campaign CRUD, rules definition, time bounds
 - [ ] **Phase 8: Rewards Dashboard** - Progress display, threshold tracking, estimates
@@ -93,8 +93,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — Enhanced address cards with chain icons, grouping, and count display
-- [ ] 05-02-PLAN.md — Remove confirmation dialog and pending-only state handling
+- [x] 05-01-PLAN.md — Enhanced address cards with chain icons, grouping, and count display
+- [x] 05-02-PLAN.md — Remove confirmation dialog and pending-only state handling
 
 ### Phase 6: Volume Tracking Engine
 **Goal**: System accurately calculates qualifying volume for each user
@@ -202,7 +202,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 2. Auth Integration | 2/2 | Complete | 2026-01-19 |
 | 3. Solana Address Management | 2/2 | Complete | 2026-01-20 |
 | 4. EVM Address Management | 1/1 | Complete | 2026-01-19 |
-| 5. Address UI | 0/2 | Planned | - |
+| 5. Address UI | 2/2 | Complete | 2026-01-19 |
 | 6. Volume Tracking Engine | 0/1 | Not started | - |
 | 7. Campaign System | 0/2 | Not started | - |
 | 8. Rewards Dashboard | 0/1 | Not started | - |
