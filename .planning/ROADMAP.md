@@ -186,7 +186,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 11-01-PLAN.md — Navigation foundation: Tabs UI component, Rewards link in WalletDropdown with claimable badge
+- [x] 11-01-PLAN.md — Navigation foundation: Tabs UI component, Rewards link in WalletDropdown with claimable badge
 - [ ] 11-02-PLAN.md — Landing page for non-enrolled users, tabbed dashboard container for enrolled users
 - [ ] 11-03-PLAN.md — Tab content components (Progress, Addresses, History) wired into dashboard
 
@@ -207,7 +207,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 8. Rewards Dashboard | 1/1 | Complete | 2026-01-20 |
 | 9. Wallet Connection | 1/1 | Complete | 2026-01-20 |
 | 10. Claims Engine | 3/3 | Complete | 2026-01-20 |
-| 11. Dashboard Integration | 0/3 | Not started | - |
+| 11. Dashboard Integration | 1/3 | In progress | - |
 
 ---
 *Roadmap created: 2026-01-19*

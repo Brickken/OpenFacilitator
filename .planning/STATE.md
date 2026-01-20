@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-19)
 ## Current Position
 
 Phase: 11 of 11 (Dashboard Integration)
-Plan: 0 of 3 in current phase
-Status: Ready to discuss/plan
-Last activity: 2026-01-20 - Phase 10 verified complete
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-01-20 - Completed 11-01-PLAN.md
 
-Progress: [#########.] 91%
+Progress: [#########.] 90%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 16
-- Average duration: 3m 37s
-- Total execution time: 0.97 hours
+- Total plans completed: 17
+- Average duration: 3m 33s
+- Total execution time: 1.01 hours
 
 **By Phase:**
 
@@ -37,9 +37,10 @@ Progress: [#########.] 91%
 | 08-rewards-dashboard | 1 | 4m 0s | 4m 0s |
 | 09-wallet-connection | 1 | 4m 0s | 4m 0s |
 | 10-claims-engine | 3 | 8m 12s | 2m 44s |
+| 11-dashboard-integration | 1 | 2m 37s | 2m 37s |
 
 **Recent Trend:**
-- Last 5 plans: 09-01 (4m 0s), 10-01 (2m 29s), 10-02 (1m 43s), 10-03 (4m 0s)
+- Last 5 plans: 10-01 (2m 29s), 10-02 (1m 43s), 10-03 (4m 0s), 11-01 (2m 37s)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -97,6 +98,9 @@ Recent decisions affecting current work:
 | D-10-03-001 | Twitter share uses intent URL (no API key needed) | 10-03 |
 | D-10-03-002 | Claim history shows above campaign history for recency | 10-03 |
 | D-10-03-003 | Status badges with color-coded states (green/amber/red/gray) | 10-03 |
+| D-11-01-001 | Rewards link always visible in WalletDropdown (not conditional) | 11-01 |
+| D-11-01-002 | hasClaimable derived from ended campaign + eligibility check | 11-01 |
+| D-11-01-003 | Green pulsing badge for claimable indicator | 11-01 |
 
 ### Pending Todos
 
@@ -111,5 +115,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Phase 10 verified complete
+Stopped at: Completed 11-01-PLAN.md
 Resume file: None
