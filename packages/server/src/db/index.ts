@@ -636,13 +636,26 @@ export function initializeDatabase(dbPath?: string): Database.Database {
       multiplier_facilitator REAL NOT NULL DEFAULT 2.0,
       starts_at TEXT NOT NULL,
       ends_at TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'ended')),
+      status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'active', 'ended')),
+      distributed_amount TEXT NOT NULL DEFAULT '0',
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     CREATE INDEX IF NOT EXISTS idx_campaigns_status ON campaigns(status);
     CREATE INDEX IF NOT EXISTS idx_campaigns_dates ON campaigns(starts_at, ends_at);
+
+    -- Campaign audit table (tracks all admin changes to campaigns)
+    CREATE TABLE IF NOT EXISTS campaign_audit (
+      id TEXT PRIMARY KEY,
+      campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+      admin_user_id TEXT NOT NULL,
+      action TEXT NOT NULL CHECK (action IN ('create', 'update', 'publish', 'end')),
+      changes TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_campaign_audit_campaign ON campaign_audit(campaign_id);
 
     -- Reward claims table (user claims against campaigns)
     CREATE TABLE IF NOT EXISTS reward_claims (
@@ -726,6 +739,7 @@ export * from './registered-servers.js';
 export * from './claims.js';
 export * from './reward-addresses.js';
 export * from './campaigns.js';
+export * from './campaign-audit.js';
 export * from './reward-claims.js';
 export * from './volume-snapshots.js';
 export * from './volume-aggregation.js';

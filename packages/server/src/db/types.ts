@@ -302,9 +302,23 @@ export interface CampaignRecord {
   multiplier_facilitator: number;
   starts_at: string;
   ends_at: string;
-  status: 'draft' | 'active' | 'ended';
+  status: 'draft' | 'published' | 'active' | 'ended';
+  distributed_amount: string;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Campaign audit database record
+ * Tracks all admin changes to campaigns
+ */
+export interface CampaignAuditRecord {
+  id: string;
+  campaign_id: string;
+  admin_user_id: string;
+  action: 'create' | 'update' | 'publish' | 'end';
+  changes: string; // JSON string
+  created_at: string;
 }
 
 /**
