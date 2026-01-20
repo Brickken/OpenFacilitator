@@ -1,13 +1,14 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { differenceInDays } from 'date-fns';
-import { Clock, ExternalLink, Loader2 } from 'lucide-react';
+import { Clock, ExternalLink, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { ProgressBar } from './progress-bar';
 import { RewardEstimate } from './reward-estimate';
 import { AddressBreakdown } from './address-breakdown';
 import { ClaimButton } from './claim-button';
-import type { Campaign, VolumeBreakdown, RewardClaim } from '@/lib/api';
+import { api, type Campaign, type VolumeBreakdown, type RewardClaim } from '@/lib/api';
 
 interface ProgressDashboardProps {
   campaign: Campaign;
@@ -39,9 +40,13 @@ export function ProgressDashboard({
   totalPoolVolume,
   isFacilitatorOwner,
   volumeBreakdown,
-  claim,
+  claim: initialClaim,
   onClaimSuccess,
 }: ProgressDashboardProps) {
+  const [claim, setClaim] = useState<RewardClaim | null>(initialClaim);
+  const [eligibilityReason, setEligibilityReason] = useState<string | null>(null);
+  const [checkingEligibility, setCheckingEligibility] = useState(false);
+
   const now = new Date();
   const endsAt = new Date(campaign.ends_at);
   const hasEnded = now >= endsAt;
@@ -62,12 +67,49 @@ export function ProgressDashboard({
   const userShare = totalVolumeNum > 0 ? effectiveVolume / totalVolumeNum : 0;
   const estimatedReward = userShare * poolAmountNum;
 
+  // Check eligibility and create claim record when campaign has ended
+  useEffect(() => {
+    async function checkEligibility() {
+      if (!hasEnded || claim) return;
+
+      setCheckingEligibility(true);
+      try {
+        const result = await api.getClaimEligibility(campaign.id);
+
+        if (result.eligible && result.claim) {
+          setClaim(result.claim);
+        } else if (!result.eligible && result.reason) {
+          setEligibilityReason(result.reason);
+        }
+      } catch (error) {
+        console.error('Failed to check eligibility:', error);
+      } finally {
+        setCheckingEligibility(false);
+      }
+    }
+
+    checkEligibility();
+  }, [hasEnded, claim, campaign.id]);
+
+  // Update claim state when initialClaim prop changes
+  useEffect(() => {
+    setClaim(initialClaim);
+  }, [initialClaim]);
+
   // Campaign ended state
   if (hasEnded) {
     return (
       <Card>
         <CardContent className="py-8 text-center">
           <h3 className="text-lg font-semibold mb-2">Campaign Ended</h3>
+
+          {/* Checking eligibility */}
+          {checkingEligibility && (
+            <div className="flex items-center justify-center gap-2 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Checking eligibility...</span>
+            </div>
+          )}
 
           {/* User met threshold and has a pending claim */}
           {claim && claim.status === 'pending' && (
@@ -148,20 +190,21 @@ export function ProgressDashboard({
             </p>
           )}
 
-          {/* User met threshold but no claim record yet (rewards being calculated) */}
-          {!claim && metThreshold && (
-            <>
-              <p className="text-muted-foreground">
-                Rewards are being calculated. Check back soon for your final reward amount.
+          {/* Show specific reason for ineligibility */}
+          {!claim && !checkingEligibility && eligibilityReason && (
+            <div className="flex flex-col items-center gap-2">
+              <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                <AlertCircle className="h-4 w-4" />
+                <span className="font-medium">Not Eligible</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {eligibilityReason}
               </p>
-              <p className="mt-4 text-green-600 dark:text-green-400 font-medium">
-                You met the threshold and are eligible for rewards!
-              </p>
-            </>
+            </div>
           )}
 
-          {/* User did not meet threshold */}
-          {!claim && !metThreshold && (
+          {/* User did not meet threshold (fallback if eligibility API not yet called) */}
+          {!claim && !checkingEligibility && !eligibilityReason && !metThreshold && (
             <p className="text-muted-foreground">
               You did not meet the volume threshold for this campaign.
             </p>

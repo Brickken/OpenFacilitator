@@ -1312,6 +1312,19 @@ class ApiClient {
   async getMyClaim(campaignId: string): Promise<{ claim: RewardClaim | null }> {
     return this.request(`/api/rewards/campaigns/${campaignId}/my-claim`);
   }
+
+  async getClaimEligibility(campaignId: string): Promise<{
+    eligible: boolean;
+    reason?: string;
+    claim: RewardClaim | null;
+    calculatedReward: {
+      baseReward: string;
+      finalReward: string;
+      multiplier: number;
+    } | null;
+  }> {
+    return this.request(`/api/rewards/campaigns/${campaignId}/eligibility`);
+  }
 }
 
 export const api = new ApiClient(API_BASE);

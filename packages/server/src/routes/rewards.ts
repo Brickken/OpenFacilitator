@@ -44,6 +44,10 @@ import {
   getRewardClaimByUserAndCampaign,
 } from '../db/reward-claims.js';
 import { getDatabase } from '../db/index.js';
+import {
+  checkClaimEligibility,
+  createOrGetClaimRecord,
+} from '../services/reward-claims.js';
 
 const router: IRouter = Router();
 
@@ -1070,6 +1074,51 @@ router.post('/claims/:id/initiate', requireAuth, async (req: Request, res: Respo
     res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to initiate claim',
+    });
+  }
+});
+
+/**
+ * GET /campaigns/:id/eligibility
+ * Check if current user is eligible to claim for a campaign
+ * Creates claim record if eligible and none exists
+ */
+router.get('/campaigns/:id/eligibility', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const campaignId = req.params.id;
+
+    // Check eligibility using the service
+    const eligibilityResult = checkClaimEligibility(userId, campaignId);
+
+    // If eligible and has calculated reward but no claim yet, create the claim record
+    if (eligibilityResult.eligible && eligibilityResult.calculatedReward && !eligibilityResult.claim) {
+      const claim = createOrGetClaimRecord(
+        userId,
+        campaignId,
+        eligibilityResult.calculatedReward
+      );
+
+      res.json({
+        eligible: true,
+        claim,
+        calculatedReward: eligibilityResult.calculatedReward,
+      });
+      return;
+    }
+
+    // Return eligibility status with claim if exists
+    res.json({
+      eligible: eligibilityResult.eligible,
+      reason: eligibilityResult.reason,
+      claim: eligibilityResult.claim || null,
+      calculatedReward: eligibilityResult.calculatedReward || null,
+    });
+  } catch (error) {
+    console.error('Error checking claim eligibility:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Failed to check eligibility',
     });
   }
 });
