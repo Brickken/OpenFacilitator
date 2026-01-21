@@ -83,6 +83,7 @@ export {
   honoRefundMiddleware,
   // Types
   type RefundProtectionConfig,
+  type MiddlewareRefundConfig,
   type PaymentContext,
   type PaymentRequest,
   type PaymentMiddlewareConfig,

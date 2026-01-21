@@ -12,8 +12,25 @@ import { isPaymentPayload } from './utils.js';
 export interface RefundProtectionConfig {
   /** The API key from server registration */
   apiKey: string;
-  /** The facilitator URL */
+  /** The facilitator URL (required for standalone usage) */
   facilitatorUrl: string;
+  /** Optional: Custom error filter - return false to skip reporting */
+  shouldReport?: (error: Error) => boolean;
+  /** Optional: Called when a failure is reported */
+  onReport?: (claimId: string | undefined, error: Error) => void;
+  /** Optional: Called when reporting fails */
+  onReportError?: (reportError: Error, originalError: Error) => void;
+}
+
+/**
+ * Refund protection config for use with payment middleware.
+ * The facilitatorUrl is optional and defaults to the middleware's facilitator URL.
+ */
+export interface MiddlewareRefundConfig {
+  /** The API key from server registration */
+  apiKey: string;
+  /** The facilitator URL (optional - defaults to the middleware's facilitator URL) */
+  facilitatorUrl?: string;
   /** Optional: Custom error filter - return false to skip reporting */
   shouldReport?: (error: Error) => boolean;
   /** Optional: Called when a failure is reported */
@@ -339,7 +356,7 @@ export interface PaymentMiddlewareConfig {
   /** Function to get payment requirements for the request (single or multiple for multi-network) */
   getRequirements: (req: unknown) => PaymentRequirements | PaymentRequirements[] | Promise<PaymentRequirements | PaymentRequirements[]>;
   /** Optional: Refund protection config (enables auto failure reporting) */
-  refundProtection?: RefundProtectionConfig;
+  refundProtection?: MiddlewareRefundConfig;
   /** Optional: Custom 402 response handler */
   on402?: (req: unknown, res: unknown, requirements: PaymentRequirements[]) => void | Promise<void>;
 }
@@ -499,6 +516,7 @@ export function createPaymentMiddleware(config: PaymentMiddlewareConfig) {
       if (config.refundProtection) {
         const originalNext = next;
         const refundConfig = config.refundProtection;
+        const refundFacilitatorUrl = refundConfig.facilitatorUrl || facilitator.url;
 
         next = async (error?: unknown) => {
           if (error) {
@@ -507,7 +525,7 @@ export function createPaymentMiddleware(config: PaymentMiddlewareConfig) {
             if (!refundConfig.shouldReport || refundConfig.shouldReport(err)) {
               try {
                 const result = await reportFailure({
-                  facilitatorUrl: refundConfig.facilitatorUrl,
+                  facilitatorUrl: refundFacilitatorUrl,
                   apiKey: refundConfig.apiKey,
                   originalTxHash: paymentContext.transactionHash,
                   userWallet: paymentContext.userWallet,
@@ -550,7 +568,7 @@ export interface HonoPaymentConfig {
   /** Function to get payment requirements for the request (single or multiple for multi-network) */
   getRequirements: (c: HonoContext) => PaymentRequirements | PaymentRequirements[] | Promise<PaymentRequirements | PaymentRequirements[]>;
   /** Optional: Refund protection config */
-  refundProtection?: RefundProtectionConfig;
+  refundProtection?: MiddlewareRefundConfig;
 }
 
 /**
@@ -687,6 +705,7 @@ export function honoPaymentMiddleware(config: HonoPaymentConfig) {
     // Handle with optional refund protection
     if (config.refundProtection) {
       const refundConfig = config.refundProtection;
+      const refundFacilitatorUrl = refundConfig.facilitatorUrl || facilitator.url;
 
       try {
         await next();
@@ -696,7 +715,7 @@ export function honoPaymentMiddleware(config: HonoPaymentConfig) {
         if (!refundConfig.shouldReport || refundConfig.shouldReport(err)) {
           try {
             const result = await reportFailure({
-              facilitatorUrl: refundConfig.facilitatorUrl,
+              facilitatorUrl: refundFacilitatorUrl,
               apiKey: refundConfig.apiKey,
               originalTxHash: paymentContext.transactionHash,
               userWallet: paymentContext.userWallet,
