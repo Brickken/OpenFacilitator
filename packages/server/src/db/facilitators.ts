@@ -235,11 +235,19 @@ export function isFacilitatorOwner(userId: string): boolean {
  * as the enrollment date.
  *
  * @param userId - The facilitator owner's user ID
- * @returns The created marker record, or null if marker already exists
+ * @returns The created marker record, or null if marker already exists or user doesn't exist
  */
 export function ensureFacilitatorMarker(userId: string): ReturnType<typeof createFacilitatorMarker> {
   const db = getDatabase();
   const normalizedUserId = userId.toLowerCase();
+
+  // Check if user exists in the user table (required for foreign key constraint)
+  const userExistsStmt = db.prepare(`
+    SELECT 1 FROM "user" WHERE id = ? LIMIT 1
+  `);
+  if (!userExistsStmt.get(normalizedUserId)) {
+    return null; // User doesn't exist in user table
+  }
 
   // Check if marker already exists
   const existingStmt = db.prepare(`
@@ -268,3 +276,26 @@ export function ensureFacilitatorMarker(userId: string): ReturnType<typeof creat
   return createFacilitatorMarker(normalizedUserId, earliest.created_at);
 }
 
+/**
+ * Backfill missing facilitator enrollment markers for all existing owners
+ * Safe to run multiple times - ensureFacilitatorMarker is idempotent
+ * @returns Number of markers created
+ */
+export function backfillFacilitatorMarkers(): number {
+  const db = getDatabase();
+
+  // Find all unique facilitator owners
+  const stmt = db.prepare(`
+    SELECT DISTINCT owner_address
+    FROM facilitators
+  `);
+  const owners = stmt.all() as { owner_address: string }[];
+
+  let created = 0;
+  for (const { owner_address } of owners) {
+    const result = ensureFacilitatorMarker(owner_address);
+    if (result) created++;
+  }
+
+  return created;
+}

@@ -10,13 +10,13 @@ describe('Auth Routes', () => {
   let app: Express;
   const testDbPath = './data/test-openfacilitator.db';
 
-  beforeAll(() => {
+  beforeAll(async () => {
     // Use test database
     process.env.DATABASE_PATH = testDbPath;
     process.env.BETTER_AUTH_SECRET = 'test-secret-for-testing-only';
     process.env.BETTER_AUTH_URL = 'http://localhost:5002';
 
-    initializeDatabase(testDbPath);
+    await initializeDatabase(testDbPath);
     initializeAuth(testDbPath);
     app = createServer();
   });

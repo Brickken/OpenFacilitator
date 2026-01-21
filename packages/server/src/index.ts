@@ -9,7 +9,7 @@ const DATABASE_PATH = process.env.DATABASE_PATH || './data/openfacilitator.db';
 
 async function main() {
   // Initialize database
-  initializeDatabase(DATABASE_PATH);
+  await initializeDatabase(DATABASE_PATH);
 
   // Initialize auth
   initializeAuth(DATABASE_PATH);

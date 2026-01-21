@@ -18,7 +18,7 @@ export function getDatabase(): Database.Database {
 /**
  * Initialize the SQLite database
  */
-export function initializeDatabase(dbPath?: string): Database.Database {
+export async function initializeDatabase(dbPath?: string): Promise<Database.Database> {
   const databasePath = dbPath || process.env.DATABASE_PATH || './data/openfacilitator.db';
 
   // Ensure directory exists
@@ -699,6 +699,19 @@ export function initializeDatabase(dbPath?: string): Database.Database {
   runMigrations(db);
 
   console.log('✅ Database initialized at', databasePath);
+
+  // Backfill missing facilitator enrollment markers
+  // Must run after tables are created and db is available
+  try {
+    // Import dynamically to avoid circular dependency issues
+    const { backfillFacilitatorMarkers } = await import('./facilitators.js');
+    const created = backfillFacilitatorMarkers();
+    if (created > 0) {
+      console.log(`[Facilitator Backfill] Created ${created} missing enrollment markers`);
+    }
+  } catch (error) {
+    console.error('[Facilitator Backfill] Error during backfill:', error);
+  }
 
   return db;
 }
