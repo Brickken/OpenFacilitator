@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { Building2, Wallet, Plus, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,10 @@ interface AddressBreakdownProps {
     chain_type: 'solana' | 'evm' | 'facilitator';
     volume: string;
     uniquePayers: number;
+    // Facilitator-specific fields
+    facilitatorId?: string;
+    facilitatorName?: string;
+    facilitatorFavicon?: string | null;
   }>;
   totalVolume: string;
   onEnrollClick?: () => void;
@@ -37,6 +42,21 @@ function ChainBadge({ chainType }: { chainType: 'solana' | 'evm' | 'facilitator'
       E
     </span>
   );
+}
+
+function FacilitatorIcon({ favicon, name }: { favicon?: string | null; name: string }) {
+  if (favicon) {
+    return (
+      <Image
+        src={favicon}
+        alt={name}
+        width={20}
+        height={20}
+        className="rounded-full"
+      />
+    );
+  }
+  return <ChainBadge chainType="facilitator" />;
 }
 
 function formatUSDC(amount: string): string {
@@ -95,21 +115,26 @@ function FacilitatorsCard({
           </div>
         ) : (
           <div className="space-y-3">
-            {facilitators.map((addr) => {
-              const volumeNum = Number(addr.volume);
+            {facilitators.map((facilitator) => {
+              const volumeNum = Number(facilitator.volume);
               const percentage = totalVolumeNum > 0 ? (volumeNum / totalVolumeNum) * 100 : 0;
 
               return (
                 <div
-                  key={addr.id}
+                  key={facilitator.id}
                   className="flex items-center justify-between py-2 border-b border-border last:border-0"
                 >
                   <div className="flex items-center gap-2">
-                    <ChainBadge chainType="facilitator" />
-                    <span className="text-sm">Facilitator Volume</span>
+                    <FacilitatorIcon
+                      favicon={facilitator.facilitatorFavicon}
+                      name={facilitator.facilitatorName || 'Facilitator'}
+                    />
+                    <span className="text-sm font-medium">
+                      {facilitator.facilitatorName || facilitator.address}
+                    </span>
                   </div>
                   <div className="flex items-center gap-3 text-sm">
-                    <span className="font-medium">{formatUSDC(addr.volume)}</span>
+                    <span className="font-medium">{formatUSDC(facilitator.volume)}</span>
                     <span className="text-muted-foreground w-14 text-right">
                       {percentage.toFixed(1)}%
                     </span>
@@ -143,18 +168,15 @@ function PayToAddressesCard({
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <Wallet className="h-4 w-4" />
-          Pay-to Addresses
+          Using our free facilitator?
         </CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Your volume still counts! Register your pay-to addresses below.
+        </p>
       </CardHeader>
       <CardContent>
         {addresses.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-6 text-center">
-            <div className="p-3 rounded-full bg-muted/50 mb-3">
-              <Wallet className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <p className="text-sm text-muted-foreground mb-3">
-              Register wallet addresses that receive payments through the free facilitator.
-            </p>
+          <div className="flex flex-col items-center justify-center py-4 text-center">
             <Button variant="outline" size="sm" onClick={onEnrollClick}>
               <Plus className="h-4 w-4 mr-1" />
               Register Address

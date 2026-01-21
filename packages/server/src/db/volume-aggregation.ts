@@ -1,5 +1,6 @@
 import { getDatabase } from './index.js';
 import { upsertVolumeSnapshot, getUserVolumeForCampaign } from './volume-snapshots.js';
+import { getFacilitatorsByOwner } from './facilitators.js';
 import type { RewardAddressRecord } from './types.js';
 
 /**
@@ -297,12 +298,50 @@ export function createDailySnapshots(
 }
 
 /**
+ * Get volume for a specific facilitator
+ * Includes only settle transactions with success status
+ * Excludes self-transfers
+ *
+ * @param facilitatorId - The facilitator ID
+ * @param sinceDate - ISO date string to count volume from (enrollment date)
+ * @returns Volume and unique payers count
+ */
+export function getVolumeByFacilitator(
+  facilitatorId: string,
+  sinceDate: string
+): { volume: string; unique_payers: number } {
+  const db = getDatabase();
+
+  const stmt = db.prepare(`
+    SELECT
+      COALESCE(SUM(CAST(t.amount AS INTEGER)), 0) as volume,
+      COUNT(DISTINCT t.from_address) as unique_payers
+    FROM transactions t
+    WHERE t.facilitator_id = ?
+      AND t.type = 'settle'
+      AND t.status = 'success'
+      AND t.from_address != t.to_address
+      AND t.created_at >= ?
+  `);
+
+  const result = stmt.get(facilitatorId, sinceDate) as {
+    volume: number;
+    unique_payers: number;
+  };
+
+  return {
+    volume: String(result.volume),
+    unique_payers: result.unique_payers,
+  };
+}
+
+/**
  * Get per-address volume breakdown for a user
- * Returns each verified address with its individual volume contribution
+ * Returns each verified address and individual facilitators with their volume
  *
  * @param userId - The user ID
  * @param campaignId - The campaign ID
- * @returns Volume breakdown per address
+ * @returns Volume breakdown per address and facilitator
  */
 export function getVolumeBreakdownByUser(
   userId: string,
@@ -317,23 +356,40 @@ export function getVolumeBreakdownByUser(
     chain_type: 'solana' | 'evm' | 'facilitator';
     volume: string;
     uniquePayers: number;
+    // Facilitator-specific fields
+    facilitatorId?: string;
+    facilitatorName?: string;
+    facilitatorFavicon?: string | null;
   }>;
 } {
   const db = getDatabase();
+  const normalizedUserId = userId.toLowerCase();
 
-  // Get all verified addresses for this user (including facilitator markers)
+  // Get all verified pay-to addresses for this user (NOT facilitator markers)
   const addressesStmt = db.prepare(`
     SELECT ra.id, ra.address, ra.chain_type, ra.created_at
     FROM reward_addresses ra
     WHERE ra.user_id = ?
       AND ra.verification_status = 'verified'
+      AND ra.chain_type != 'facilitator'
   `);
   const addresses = addressesStmt.all(userId) as Array<{
     id: string;
     address: string;
-    chain_type: 'solana' | 'evm' | 'facilitator';
+    chain_type: 'solana' | 'evm';
     created_at: string;
   }>;
+
+  // Get the facilitator enrollment marker to check if enrolled
+  const enrollmentStmt = db.prepare(`
+    SELECT ra.created_at
+    FROM reward_addresses ra
+    WHERE ra.user_id = ?
+      AND ra.verification_status = 'verified'
+      AND ra.chain_type = 'facilitator'
+    LIMIT 1
+  `);
+  const enrollmentMarker = enrollmentStmt.get(userId) as { created_at: string } | undefined;
 
   const result: Array<{
     id: string;
@@ -341,35 +397,51 @@ export function getVolumeBreakdownByUser(
     chain_type: 'solana' | 'evm' | 'facilitator';
     volume: string;
     uniquePayers: number;
+    facilitatorId?: string;
+    facilitatorName?: string;
+    facilitatorFavicon?: string | null;
   }> = [];
 
   let totalVolumeBigInt = BigInt(0);
 
+  // Add pay-to addresses
   for (const addr of addresses) {
-    let volume = '0';
-    let uniquePayers = 0;
-
-    if (addr.chain_type === 'facilitator') {
-      // Get volume from facilitator ownership
-      const volumeData = getVolumeByFacilitatorOwnership(userId, addr.created_at);
-      volume = volumeData.volume;
-      uniquePayers = volumeData.unique_payers;
-    } else {
-      // Get volume from this specific address
-      const volumeData = getVolumeByAddress(addr.id, addr.created_at);
-      volume = volumeData.volume;
-      uniquePayers = volumeData.unique_payers;
-    }
-
-    totalVolumeBigInt += BigInt(volume);
+    const volumeData = getVolumeByAddress(addr.id, addr.created_at);
+    totalVolumeBigInt += BigInt(volumeData.volume);
 
     result.push({
       id: addr.id,
       address: addr.address,
       chain_type: addr.chain_type,
-      volume,
-      uniquePayers,
+      volume: volumeData.volume,
+      uniquePayers: volumeData.unique_payers,
     });
+  }
+
+  // Add individual facilitators if user is enrolled
+  if (enrollmentMarker) {
+    const facilitators = getFacilitatorsByOwner(normalizedUserId);
+
+    for (const facilitator of facilitators) {
+      // Use the later of: enrollment date or facilitator creation date
+      const effectiveSinceDate = facilitator.created_at > enrollmentMarker.created_at
+        ? facilitator.created_at
+        : enrollmentMarker.created_at;
+
+      const volumeData = getVolumeByFacilitator(facilitator.id, effectiveSinceDate);
+      totalVolumeBigInt += BigInt(volumeData.volume);
+
+      result.push({
+        id: `facilitator-${facilitator.id}`,
+        address: facilitator.subdomain,
+        chain_type: 'facilitator',
+        volume: volumeData.volume,
+        uniquePayers: volumeData.unique_payers,
+        facilitatorId: facilitator.id,
+        facilitatorName: facilitator.name,
+        facilitatorFavicon: facilitator.favicon,
+      });
+    }
   }
 
   return {
