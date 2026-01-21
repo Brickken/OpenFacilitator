@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 ## Current Position
 
 Milestone: v1.1 SDK & Docs
-Phase: 12 of 15 (SDK Type Definitions)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-20 — Roadmap created for v1.1
+Phase: 12 of 16 (SDK Type Definitions)
+Plan: 01 of 01 complete
+Status: Phase complete
+Last activity: 2026-01-21 — Completed 12-01-PLAN.md
 
-Progress: [##########..........] 73% (v1.0 complete, v1.1 starting)
+Progress: [████████████████████] 100% (20/20 plans complete)
 
 ## Performance Metrics
 
@@ -25,14 +25,27 @@ Progress: [##########..........] 73% (v1.0 complete, v1.1 starting)
 - Total execution time: 1.07 hours
 - Phases: 11
 
-**v1.1:** Not started
+**v1.1:**
+- Plans completed: 1
+- Average duration: 2m 21s
+- Total execution time: 2m 21s
+- Phases: 1 (Phase 12 complete)
 
 ## Accumulated Context
+
+### Roadmap Evolution
+
+- Phase 16 added: $OPEN Rewards Homepage Section
 
 ### Decisions
 
 See PROJECT.md Key Decisions table for full history.
 v1.0 decisions archived in milestones/v1.0-ROADMAP.md.
+
+**Phase 12 (SDK Type Definitions):**
+- Literal types (1, 2) for x402Version enable TypeScript narrowing
+- PaymentRequirements discriminated by field presence (maxAmountRequired vs amount)
+- Union type exports maintain backward compatibility
 
 ### Pending Todos
 
@@ -47,6 +60,6 @@ v1.0 decisions archived in milestones/v1.0-ROADMAP.md.
 
 ## Session Continuity
 
-Last session: 2026-01-20
-Stopped at: Created v1.1 roadmap (Phases 12-15)
-Resume with: `/gsd:plan-phase 12`
+Last session: 2026-01-21
+Stopped at: Completed 12-01-PLAN.md (SDK Type Definitions)
+Resume with: Plan next phase in v1.1 milestone (Phases 13-16 remaining)
