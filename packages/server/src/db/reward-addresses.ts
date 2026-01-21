@@ -88,3 +88,48 @@ export function isUserEnrolledInRewards(userId: string): boolean {
   const stmt = db.prepare('SELECT 1 FROM reward_addresses WHERE user_id = ? LIMIT 1');
   return stmt.get(userId) !== undefined;
 }
+
+/**
+ * Create a facilitator enrollment marker for volume tracking
+ * This creates a special reward_address with chain_type='facilitator' that acts
+ * as an enrollment marker for volume aggregation.
+ *
+ * @param userId - The facilitator owner's user ID
+ * @param enrollmentDate - The date to backdate the marker to (facilitator's created_at)
+ * @returns The created marker record, or null if marker already exists
+ */
+export function createFacilitatorMarker(
+  userId: string,
+  enrollmentDate: string
+): RewardAddressRecord | null {
+  const db = getDatabase();
+  const id = nanoid();
+
+  // Use deterministic address to satisfy UNIQUE constraint (one per user)
+  const address = `FACILITATOR_OWNER:${userId}`;
+
+  try {
+    // Insert the marker
+    const insertStmt = db.prepare(`
+      INSERT INTO reward_addresses (id, user_id, chain_type, address, verification_status, verified_at)
+      VALUES (?, ?, 'facilitator', ?, 'verified', datetime('now'))
+    `);
+    insertStmt.run(id, userId, address);
+
+    // Backdate created_at to the enrollmentDate (critical for historical volume)
+    const updateStmt = db.prepare(`
+      UPDATE reward_addresses
+      SET created_at = ?
+      WHERE id = ?
+    `);
+    updateStmt.run(enrollmentDate, id);
+
+    return getRewardAddressById(id);
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+      // Marker already exists, return null silently (idempotent)
+      return null;
+    }
+    throw error;
+  }
+}

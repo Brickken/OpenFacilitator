@@ -1,6 +1,7 @@
 import { nanoid } from 'nanoid';
 import { getDatabase } from './index.js';
 import type { FacilitatorRecord } from './types.js';
+import { createFacilitatorMarker } from './reward-addresses.js';
 
 /**
  * Create a new facilitator
@@ -226,5 +227,44 @@ export function isFacilitatorOwner(userId: string): boolean {
   const db = getDatabase();
   const stmt = db.prepare('SELECT 1 FROM facilitators WHERE owner_address = ? LIMIT 1');
   return stmt.get(userId.toLowerCase()) !== undefined;
+}
+
+/**
+ * Ensure a facilitator owner has an enrollment marker for volume tracking
+ * Creates the marker if it doesn't exist, using the earliest facilitator's created_at
+ * as the enrollment date.
+ *
+ * @param userId - The facilitator owner's user ID
+ * @returns The created marker record, or null if marker already exists
+ */
+export function ensureFacilitatorMarker(userId: string): ReturnType<typeof createFacilitatorMarker> {
+  const db = getDatabase();
+  const normalizedUserId = userId.toLowerCase();
+
+  // Check if marker already exists
+  const existingStmt = db.prepare(`
+    SELECT 1 FROM reward_addresses
+    WHERE user_id = ? AND chain_type = 'facilitator'
+    LIMIT 1
+  `);
+  if (existingStmt.get(normalizedUserId)) {
+    return null; // Marker already exists
+  }
+
+  // Find the user's earliest facilitator by created_at
+  const earliestStmt = db.prepare(`
+    SELECT created_at FROM facilitators
+    WHERE owner_address = ?
+    ORDER BY created_at ASC
+    LIMIT 1
+  `);
+  const earliest = earliestStmt.get(normalizedUserId) as { created_at: string } | undefined;
+
+  if (!earliest) {
+    return null; // User doesn't own any facilitators
+  }
+
+  // Create the marker with the earliest facilitator's created_at
+  return createFacilitatorMarker(normalizedUserId, earliest.created_at);
 }
 
