@@ -55,28 +55,28 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SDK-01 | TBD | Pending |
-| SDK-02 | TBD | Pending |
-| SDK-03 | TBD | Pending |
-| SDK-04 | TBD | Pending |
-| SDK-05 | TBD | Pending |
-| SDK-06 | TBD | Pending |
-| SDK-07 | TBD | Pending |
-| SDK-08 | TBD | Pending |
-| SDK-09 | TBD | Pending |
-| SDK-10 | TBD | Pending |
-| SDK-11 | TBD | Pending |
-| SDK-12 | TBD | Pending |
-| DOCS-01 | TBD | Pending |
-| DOCS-02 | TBD | Pending |
-| DOCS-03 | TBD | Pending |
-| DOCS-04 | TBD | Pending |
+| SDK-01 | Phase 12 | Pending |
+| SDK-02 | Phase 12 | Pending |
+| SDK-03 | Phase 12 | Pending |
+| SDK-04 | Phase 13 | Pending |
+| SDK-05 | Phase 13 | Pending |
+| SDK-06 | Phase 13 | Pending |
+| SDK-07 | Phase 14 | Pending |
+| SDK-08 | Phase 13 | Pending |
+| SDK-09 | Phase 12 | Pending |
+| SDK-10 | Phase 14 | Pending |
+| SDK-11 | Phase 14 | Pending |
+| SDK-12 | Phase 14 | Pending |
+| DOCS-01 | Phase 15 | Pending |
+| DOCS-02 | Phase 15 | Pending |
+| DOCS-03 | Phase 15 | Pending |
+| DOCS-04 | Phase 15 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 16 total
-- Mapped to phases: 0
-- Unmapped: 16 (pending roadmap)
+- Mapped to phases: 16
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-01-20*
-*Last updated: 2026-01-20 after initial definition*
+*Last updated: 2026-01-20 after roadmap creation*
