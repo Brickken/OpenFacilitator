@@ -60,10 +60,11 @@ v1.0 decisions archived in milestones/v1.0-ROADMAP.md.
 - Unsupported versions throw descriptive error
 
 **Phase 15 (Refund Documentation):**
-- Refunds placed after Errors in sidebar (specialized topic following core methods)
-- Comprehensive single-page format (331 lines) for reportFailure and withRefundProtection
-- Code examples follow settle/verify pattern: full TypeScript types, imports, comments
-- Troubleshooting Q&A section addresses common merchant scenarios
+- Middleware-first docs: honoPaymentMiddleware/createPaymentMiddleware with refundProtection config
+- Tab navigation (Hono/Express/Manual) via new CodeTabs component
+- facilitatorUrl now optional in middleware - defaults to facilitator URL
+- Route renamed /claims/setup → /refunds/setup for URL consistency
+- Simplified setup page copy (removed x402 link - users already know)
 
 ### Pending Todos
 
