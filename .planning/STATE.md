@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-01-22)
 ## Current Position
 
 Milestone: v1.2 Subscription Wallet Overhaul
-Phase: 19 - Chain Preference Logic
-Plan: 2 of 2 complete
-Status: Phase verified and complete
-Last activity: 2026-01-22 — Phase 19 verified (5/5 must-haves)
+Phase: 20 - Recurring Payment Engine
+Plan: 1 of 3 complete
+Status: In progress
+Last activity: 2026-01-22 — Completed 20-01-PLAN.md
 
-Progress: [████████████░░░░░░░░] 60%
+Progress: [█████████████░░░░░░░] 65%
 
 ## Phase Summary
 
@@ -24,7 +24,7 @@ Progress: [████████████░░░░░░░░] 60%
 | 17 | UI Cleanup & Subscriptions Section | 8 | Complete ✓ |
 | 18 | Multi-Chain Wallet Infrastructure | 4 | Complete ✓ |
 | 19 | Chain Preference Logic | 3 | Complete ✓ |
-| 20 | Recurring Payment Engine | 6 | Next |
+| 20 | Recurring Payment Engine | 6 | In progress (1/3 plans) |
 | 21 | Notifications & Edge Cases | 4 | Pending |
 
 ## Performance Metrics
@@ -42,13 +42,13 @@ Progress: [████████████░░░░░░░░] 60%
 - Phases: 5 (Phases 12-16 complete)
 
 **v1.2 Velocity:**
-- Plans completed: 7
-- Average duration: 2m 38s
-- Total execution time: 19m 39s
+- Plans completed: 8
+- Average duration: 2m 42s
+- Total execution time: 22m 39s
 - Phases: 5 (Phases 17-21 planned)
 
 **Cumulative:**
-- Total plans: 31
+- Total plans: 32
 - Total phases: 21 (19 complete, 2 pending)
 - Milestones shipped: 2
 
@@ -82,6 +82,9 @@ v1.2 decisions:
 - Blue for Base toggle, purple for Solana toggle (chain branding)
 - Toggle disabled when both wallets don't exist (clear UX)
 - Optimistic UI updates with rollback on error (responsive feel)
+- Log all payment attempts (not just successes) for debugging and retry logic
+- is_fallback flag tracks when payment used alternate chain
+- Subscription extension only after successful payment
 
 ### Pending Todos
 
@@ -95,9 +98,10 @@ v1.2 decisions:
 
 - **Pre-Launch:** Rewards wallet must be funded before claims go live (March 2026)
 - **Pre-Launch:** CRON_SECRET env var for volume snapshot cron jobs
+- **Phase 20:** Base chain payments not yet supported in x402-client (Solana only)
 
 ## Session Continuity
 
-Last session: 2026-01-22
-Stopped at: Phase 19 verified and complete
-Resume with: `/gsd:discuss-phase 20`
+Last session: 2026-01-22 20:52 UTC
+Stopped at: Completed 20-01-PLAN.md
+Resume file: None
