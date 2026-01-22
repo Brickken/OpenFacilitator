@@ -3,10 +3,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar, DollarSign } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
-import type { SubscriptionStatus } from '@/lib/api';
+import type { SubscriptionStatusResponse } from '@/lib/api';
 
 interface BillingCardProps {
-  subscription: SubscriptionStatus | null | undefined;
+  subscription: SubscriptionStatusResponse | null | undefined;
 }
 
 export function BillingCard({ subscription }: BillingCardProps) {

@@ -33,10 +33,17 @@ export default function SubscriptionsPage() {
     enabled: isAuthenticated,
   });
 
-  // Fetch payment history
-  const { data: historyData, isLoading: historyLoading } = useQuery({
+  // Fetch payment history (old endpoint - subscription records)
+  const { data: historyData } = useQuery({
     queryKey: ['subscriptionHistory'],
     queryFn: () => api.getSubscriptionHistory(),
+    enabled: isAuthenticated,
+  });
+
+  // Fetch payment attempts (new endpoint - detailed payment attempts)
+  const { data: paymentsData, isLoading: paymentsLoading } = useQuery({
+    queryKey: ['subscriptionPayments'],
+    queryFn: () => api.getSubscriptionPayments(),
     enabled: isAuthenticated,
   });
 
@@ -51,6 +58,7 @@ export default function SubscriptionsPage() {
         });
         queryClient.invalidateQueries({ queryKey: ['subscription'] });
         queryClient.invalidateQueries({ queryKey: ['subscriptionHistory'] });
+        queryClient.invalidateQueries({ queryKey: ['subscriptionPayments'] });
         queryClient.invalidateQueries({ queryKey: ['billingWallet'] });
       } else if (result.insufficientBalance) {
         toast({
@@ -69,6 +77,34 @@ export default function SubscriptionsPage() {
     onError: (error) => {
       toast({
         title: 'Purchase failed',
+        description: error instanceof Error ? error.message : 'Something went wrong',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Reactivate subscription mutation
+  const reactivateMutation = useMutation({
+    mutationFn: () => api.reactivateSubscription(),
+    onSuccess: (result) => {
+      if (result.success) {
+        toast({
+          title: 'Subscription reactivated!',
+          description: 'Your subscription is now active.',
+        });
+        queryClient.invalidateQueries({ queryKey: ['subscription'] });
+        queryClient.invalidateQueries({ queryKey: ['subscriptionPayments'] });
+      } else {
+        toast({
+          title: 'Reactivation failed',
+          description: result.error || 'Please fund your wallet and try again.',
+          variant: 'destructive',
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: 'Reactivation failed',
         description: error instanceof Error ? error.message : 'Something went wrong',
         variant: 'destructive',
       });
@@ -107,6 +143,8 @@ export default function SubscriptionsPage() {
             subscription={subscription}
             onSubscribe={() => purchaseMutation.mutate()}
             isSubscribing={purchaseMutation.isPending}
+            onReactivate={() => reactivateMutation.mutate()}
+            isReactivating={reactivateMutation.isPending}
           />
           <BillingCard subscription={subscription} />
         </div>
@@ -122,8 +160,8 @@ export default function SubscriptionsPage() {
 
         {/* Payment History */}
         <PaymentHistory
-          payments={historyData?.payments || []}
-          isLoading={historyLoading}
+          payments={paymentsData?.payments || []}
+          isLoading={paymentsLoading}
         />
       </main>
     </div>

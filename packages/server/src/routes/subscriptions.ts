@@ -294,4 +294,134 @@ router.post('/purchase', requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /api/subscriptions/billing
+ * Daily cron endpoint that processes all due subscriptions
+ * Requires CRON_SECRET header for authentication
+ */
+router.post('/billing', async (req: Request, res: Response) => {
+  try {
+    // Verify cron secret
+    const cronSecret = req.headers['x-cron-secret'];
+    if (!cronSecret || cronSecret !== process.env.CRON_SECRET) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    console.log('[Billing] Starting daily billing process');
+
+    // Get all subscriptions that are due for billing
+    const dueSubscriptions = getDueSubscriptions();
+    console.log(`[Billing] Found ${dueSubscriptions.length} due subscriptions`);
+
+    let succeeded = 0;
+    let failed = 0;
+    let insufficientFunds = 0;
+
+    // Process each due subscription
+    for (const subscription of dueSubscriptions) {
+      console.log(`[Billing] Processing subscription ${subscription.id} for user ${subscription.user_id}`);
+
+      try {
+        const result = await processSubscriptionPayment(subscription.user_id);
+
+        if (result.success) {
+          succeeded++;
+          console.log(`[Billing] ✓ Payment successful for user ${subscription.user_id}`);
+        } else if (result.insufficientBothChains) {
+          insufficientFunds++;
+          console.log(`[Billing] ⚠ Insufficient balance for user ${subscription.user_id}`);
+        } else {
+          failed++;
+          console.error(`[Billing] ✗ Payment failed for user ${subscription.user_id}:`, result.error);
+        }
+      } catch (error) {
+        failed++;
+        console.error(`[Billing] ✗ Error processing subscription for user ${subscription.user_id}:`, error);
+      }
+    }
+
+    const summary = {
+      processed: dueSubscriptions.length,
+      succeeded,
+      failed,
+      insufficientFunds,
+    };
+
+    console.log('[Billing] Daily billing complete:', summary);
+
+    res.json(summary);
+  } catch (error) {
+    console.error('[Billing] Cron error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/subscriptions/reactivate
+ * Instant reactivation during grace period
+ * Requires authentication
+ */
+router.post('/reactivate', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    console.log(`[Reactivate] User ${userId} attempting reactivation`);
+
+    // Check if user is in grace period
+    if (!isInGracePeriod(userId)) {
+      console.log(`[Reactivate] User ${userId} is not in grace period`);
+      res.status(400).json({
+        success: false,
+        error: 'Not in grace period',
+        message: 'You can only reactivate during the 7-day grace period after subscription expiration.',
+      });
+      return;
+    }
+
+    // Attempt to process payment
+    const result = await processSubscriptionPayment(userId);
+
+    if (result.success) {
+      console.log(`[Reactivate] Payment successful for user ${userId}`);
+
+      // Get updated subscription
+      const subscription = getActiveSubscription(userId);
+
+      res.json({
+        success: true,
+        subscription: subscription
+          ? {
+              tier: subscription.tier,
+              expires: subscription.expires_at,
+            }
+          : null,
+      });
+      return;
+    }
+
+    if (result.insufficientBothChains) {
+      console.log(`[Reactivate] Insufficient balance on both chains for user ${userId}`);
+      res.status(402).json({
+        success: false,
+        error: 'Insufficient balance',
+        message: 'Insufficient USDC balance on both Solana and Base chains. Please fund your wallets.',
+      });
+      return;
+    }
+
+    console.error(`[Reactivate] Payment failed for user ${userId}:`, result.error);
+    res.status(500).json({
+      success: false,
+      error: result.error || 'Payment failed',
+    });
+  } catch (error) {
+    console.error('[Reactivate] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+    });
+  }
+});
+
 export { router as subscriptionsRouter };

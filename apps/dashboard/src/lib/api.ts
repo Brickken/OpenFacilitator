@@ -909,7 +909,7 @@ class ApiClient {
   }
 
   // Subscription Management
-  async getSubscriptionStatus(): Promise<SubscriptionStatus> {
+  async getSubscriptionStatus(): Promise<SubscriptionStatusResponse> {
     return this.request('/api/subscriptions/status');
   }
 

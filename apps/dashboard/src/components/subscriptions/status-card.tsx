@@ -2,25 +2,10 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react';
-import type { SubscriptionStatus } from '@/lib/api';
+import { CheckCircle, Clock, XCircle, AlertCircle, AlertTriangle } from 'lucide-react';
+import type { SubscriptionStatusResponse } from '@/lib/api';
 
 type SubscriptionState = 'active' | 'pending' | 'inactive' | 'never';
-
-function getSubscriptionState(subscription: SubscriptionStatus | null | undefined): SubscriptionState {
-  if (!subscription || subscription.tier === null) return 'never';
-  if (subscription.active) return 'active';
-
-  // Check if in grace period (7 days after expiration)
-  if (subscription.expires) {
-    const expiresDate = new Date(subscription.expires);
-    const gracePeriodEnd = new Date(expiresDate);
-    gracePeriodEnd.setDate(gracePeriodEnd.getDate() + 7);
-    if (new Date() < gracePeriodEnd) return 'pending';
-  }
-
-  return 'inactive';
-}
 
 const statusConfig = {
   active: {
@@ -54,15 +39,27 @@ const statusConfig = {
 };
 
 interface StatusCardProps {
-  subscription: SubscriptionStatus | null | undefined;
+  subscription: SubscriptionStatusResponse | null | undefined;
   onSubscribe?: () => void;
   isSubscribing?: boolean;
+  onReactivate?: () => void;
+  isReactivating?: boolean;
 }
 
-export function StatusCard({ subscription, onSubscribe, isSubscribing }: StatusCardProps) {
-  const state = getSubscriptionState(subscription);
+export function StatusCard({
+  subscription,
+  onSubscribe,
+  isSubscribing,
+  onReactivate,
+  isReactivating
+}: StatusCardProps) {
+  const state = subscription?.state || 'never';
   const config = statusConfig[state];
   const Icon = config.icon;
+
+  // Calculate urgency for grace period countdown
+  const daysRemaining = subscription?.gracePeriod?.daysRemaining || 0;
+  const isUrgent = daysRemaining <= 2;
 
   return (
     <Card>
@@ -80,20 +77,70 @@ export function StatusCard({ subscription, onSubscribe, isSubscribing }: StatusC
           </div>
         </div>
 
-        {(state === 'never' || state === 'inactive') && onSubscribe && (
-          <Button
-            onClick={onSubscribe}
-            className="w-full"
-            disabled={isSubscribing}
-          >
-            {isSubscribing ? 'Processing...' : 'Subscribe Now'}
-          </Button>
+        {state === 'active' && subscription?.expires && (
+          <p className="text-sm text-muted-foreground">
+            Expires {new Date(subscription.expires).toLocaleDateString()}
+          </p>
         )}
 
-        {state === 'pending' && (
-          <p className="text-sm text-amber-600 dark:text-amber-400">
-            Please fund your wallet to continue your subscription.
-          </p>
+        {state === 'pending' && subscription?.gracePeriod && (
+          <div className="space-y-3">
+            <div className={`flex items-center gap-2 p-3 rounded-lg ${isUrgent ? 'bg-red-50 dark:bg-red-950/30' : 'bg-amber-50 dark:bg-amber-950/30'}`}>
+              <AlertTriangle className={`w-5 h-5 flex-shrink-0 ${isUrgent ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`} />
+              <div>
+                <p className={`text-sm font-medium ${isUrgent ? 'text-red-900 dark:text-red-200' : 'text-amber-900 dark:text-amber-200'}`}>
+                  {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'} left to fund wallet
+                </p>
+                <p className={`text-xs ${isUrgent ? 'text-red-700 dark:text-red-300' : 'text-amber-700 dark:text-amber-300'}`}>
+                  Fund your wallet to continue service
+                </p>
+              </div>
+            </div>
+            {onReactivate && (
+              <Button
+                onClick={onReactivate}
+                className="w-full"
+                disabled={isReactivating}
+                variant={isUrgent ? 'destructive' : 'default'}
+              >
+                {isReactivating ? 'Processing...' : 'Reactivate Now'}
+              </Button>
+            )}
+          </div>
+        )}
+
+        {state === 'inactive' && (
+          <div className="space-y-3">
+            <p className="text-sm text-red-600 dark:text-red-400">
+              Your subscription has expired
+            </p>
+            {onSubscribe && (
+              <Button
+                onClick={onSubscribe}
+                className="w-full"
+                disabled={isSubscribing}
+              >
+                {isSubscribing ? 'Processing...' : 'Subscribe'}
+              </Button>
+            )}
+          </div>
+        )}
+
+        {state === 'never' && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Start your subscription today
+            </p>
+            {onSubscribe && (
+              <Button
+                onClick={onSubscribe}
+                className="w-full"
+                disabled={isSubscribing}
+              >
+                {isSubscribing ? 'Processing...' : 'Subscribe'}
+              </Button>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>
