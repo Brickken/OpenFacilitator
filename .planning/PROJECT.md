@@ -1,12 +1,25 @@
-# OpenFacilitator Rewards Program
+# OpenFacilitator
 
 ## What This Is
 
-A rewards program that pays users $OPEN tokens (Solana SPL) for volume processed through OpenFacilitator. Users register pay-to addresses, prove ownership via wallet signatures, track volume in real-time, and claim tokens when thresholds are met. This is a customer acquisition strategy — no other facilitator pays users to use them.
+A multi-tenant crypto payment facilitator with a rewards program that pays users $OPEN tokens for volume processed. Users can create facilitators, manage products, and earn rewards. The platform supports both Solana and Base chains for payments and subscriptions.
 
 ## Core Value
 
-Users who process volume through OpenFacilitator get rewarded with $OPEN tokens. Hit threshold, get tokens. Own a white-label facilitator, get 2x.
+Users who process volume through OpenFacilitator get rewarded with $OPEN tokens. Facilitator owners get seamless subscription management with multi-chain support.
+
+## Current Milestone: v1.2 Subscription Wallet Overhaul
+
+**Goal:** Replace confusing legacy embedded wallet with a dedicated Subscriptions section supporting dual-chain (Base + Solana) recurring payments.
+
+**Target features:**
+- Remove legacy wallet from header
+- Dedicated Subscriptions dashboard section
+- Dual-wallet support (Base + Solana) with visible addresses
+- Daily recurring payment engine with 7-day grace period
+- Chain preference with prominent toggle
+- Pre-funding any amount allowed
+- No mid-cycle refunds (subscription runs until end)
 
 ## Current State
 
@@ -51,11 +64,25 @@ Users who process volume through OpenFacilitator get rewarded with $OPEN tokens.
 - ✓ Comprehensive refund documentation for merchants — v1.1
 - ✓ Whitelabel facilitator volume tracking — v1.1
 
+### Active
+
+- [ ] Remove legacy embedded wallet from header
+- [ ] Create Subscriptions dashboard section with status display
+- [ ] Implement Base wallet alongside Solana wallet
+- [ ] Show wallet addresses directly for funding
+- [ ] Chain preference toggle (prominent in Subscriptions section)
+- [ ] Daily billing cron job
+- [ ] Auto-deduction with preferred chain fallback
+- [ ] 7-day grace period for failed payments
+- [ ] Low balance and payment status notifications
+- [ ] Subscription payment history with tx hashes
+
 ### Future
 
 - Dashboard features spotlight for discoverability
 - Email notifications when threshold reached or claim available
 - Sybil cluster detection dashboard for admins
+- Prorated refunds for mid-cycle cancellation
 
 ### Out of Scope
 
@@ -108,5 +135,11 @@ Users who process volume through OpenFacilitator get rewarded with $OPEN tokens.
 | Middleware-first refund docs | Simpler DX for most merchants | ✓ Good |
 | Facilitator markers in reward_addresses | Reuses existing volume aggregation queries | ✓ Good |
 
+| Show wallet addresses directly | Power user friendly, direct deposits | — Pending |
+| 7-day grace period | Standard industry practice | — Pending |
+| Pre-fund any amount | Flexibility for users | — Pending |
+| No mid-cycle refunds | Simpler, subscription runs until end | — Pending |
+| Prominent chain preference toggle | Easy discoverability, user control | — Pending |
+
 ---
-*Last updated: 2026-01-21 after v1.1 milestone*
+*Last updated: 2026-01-22 after starting v1.2 milestone*
