@@ -104,6 +104,13 @@ Plans:
 
 **Requirements:** RECR-01, RECR-02, RECR-03, RECR-04, RECR-05, RECR-06
 
+**Plans:** 3 plans
+
+Plans:
+- [ ] 20-01-PLAN.md — Payment database layer and billing service with fallback logic
+- [ ] 20-02-PLAN.md — Billing cron endpoint and grace period management
+- [ ] 20-03-PLAN.md — Frontend grace period UI, CSV export, enhanced payment history
+
 **Success Criteria:**
 
 1. User with sufficient balance sees subscription auto-renewed daily without manual action
@@ -145,4 +152,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-01-22*
-*Last updated: 2026-01-22 — Phase 19 complete*
+*Last updated: 2026-01-22 — Phase 20 planned (3 plans)*
