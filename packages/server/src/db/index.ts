@@ -695,6 +695,17 @@ export async function initializeDatabase(dbPath?: string): Promise<Database.Data
     CREATE INDEX IF NOT EXISTS idx_volume_snapshots_address ON volume_snapshots(reward_address_id);
     CREATE INDEX IF NOT EXISTS idx_volume_snapshots_campaign ON volume_snapshots(campaign_id);
     CREATE INDEX IF NOT EXISTS idx_volume_snapshots_date ON volume_snapshots(snapshot_date);
+
+    -- User preferences table (chain preference for payments)
+    CREATE TABLE IF NOT EXISTS user_preferences (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL UNIQUE REFERENCES "user" ("id") ON DELETE CASCADE,
+      preferred_chain TEXT NOT NULL DEFAULT 'solana' CHECK (preferred_chain IN ('base', 'solana')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_user_preferences_user ON user_preferences(user_id);
   `);
 
   // Run migrations for schema updates
@@ -759,3 +770,4 @@ export * from './campaign-audit.js';
 export * from './reward-claims.js';
 export * from './volume-snapshots.js';
 export * from './volume-aggregation.js';
+export * from './user-preferences.js';
