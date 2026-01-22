@@ -69,10 +69,10 @@ export function Navbar() {
               Earn $OPEN rewards
             </span>
             <Link
-              href="/rewards"
+              href={isAuthenticated ? '/rewards' : '/auth/signin'}
               className="font-medium text-blue-200 hover:text-white transition-colors whitespace-nowrap"
             >
-              Learn more →
+              {isAuthenticated ? 'Learn more →' : 'Get started →'}
             </Link>
           </div>
           <button
