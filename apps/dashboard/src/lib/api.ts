@@ -242,6 +242,25 @@ export interface ChainPreferenceUpdateResponse {
   updated: boolean;
 }
 
+// Notification types
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: 'payment_success' | 'payment_failed' | 'low_balance' | 'expiration_reminder' | 'subscription_restored' | 'subscription_expired';
+  title: string;
+  message: string;
+  severity: 'success' | 'warning' | 'error' | 'info';
+  read: boolean;
+  dismissed: boolean;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface NotificationsResponse {
+  notifications: Notification[];
+  unreadCount: number;
+}
+
 export interface SubscriptionStatus {
   active: boolean;
   tier: 'starter' | 'basic' | 'pro' | null; // 'basic' and 'pro' for backwards compatibility
@@ -976,6 +995,23 @@ class ApiClient {
     }
 
     return data;
+  }
+
+  // Notifications
+  async getNotifications(): Promise<NotificationsResponse> {
+    return this.request('/api/notifications');
+  }
+
+  async markNotificationAsRead(id: string): Promise<{ success: boolean }> {
+    return this.request(`/api/notifications/${id}/read`, { method: 'POST' });
+  }
+
+  async dismissNotification(id: string): Promise<{ success: boolean }> {
+    return this.request(`/api/notifications/${id}/dismiss`, { method: 'POST' });
+  }
+
+  async markAllNotificationsAsRead(): Promise<{ success: boolean }> {
+    return this.request('/api/notifications/mark-all-read', { method: 'POST' });
   }
 
   // Chain Preference
