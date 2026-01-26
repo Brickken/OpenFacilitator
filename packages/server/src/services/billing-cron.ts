@@ -18,7 +18,12 @@ export function initializeBillingCron(): void {
   // Run at midnight UTC every day
   cron.schedule('0 0 * * *', async () => {
     console.log('[Billing Cron] Starting daily billing process');
-    await runBillingCycle();
+    try {
+      await runBillingCycle();
+    } catch (error) {
+      console.error('[Billing Cron] CRITICAL: Billing cycle failed with unhandled error:', error);
+      // Don't rethrow - prevent crashing the server
+    }
   }, {
     timezone: 'UTC',
   });
