@@ -13,6 +13,11 @@ export const knownTokens: Record<string, Record<ChainId, string>> = {
     solana: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // Solana Mainnet
     'solana-devnet': '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU', // Solana Devnet
   },
+  BKN: {
+    8453: '0xFc209EeBA3D744aA741cc5C2A73Ebf9C977B5F82', // Base Mainnet
+    1: '0xFc209EeBA3D744aA741cc5C2A73Ebf9C977B5F82', // Ethereum Mainnet
+    11151111: '0x2458fB1620ff84019d73216fF20aA1F82Bc8E4CC' // Sepolia
+  },
   // WETH addresses (EVM only)
   WETH: {
     8453: '0x4200000000000000000000000000000000000006', // Base
@@ -45,6 +50,13 @@ export const knownTokens: Record<string, Record<ChainId, string>> = {
  * Default token configurations for facilitators (production)
  */
 export const defaultTokens: TokenConfig[] = [
+  // BKN on Base Mainnet and Ethereum Mainnet
+  {
+    address: knownTokens.BKN[8453],
+    symbol: 'BKN', 
+    decimals: 18, 
+    chainId: 8453,
+  },
   // USDC on Base Mainnet
   {
     address: knownTokens.USDC[8453],
@@ -86,6 +98,13 @@ export const defaultTokens: TokenConfig[] = [
  * Test token configurations
  */
 export const testTokens: TokenConfig[] = [
+  // BKN on Sepolia
+  { 
+    address: knownTokens.BKN[11155111], 
+    symbol: 'BKN',
+    decimals: 18, 
+    chainId: 11155111 
+  }, 
   // USDC on Base Sepolia
   {
     address: knownTokens.USDC[84532],
