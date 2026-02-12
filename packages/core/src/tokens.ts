@@ -16,7 +16,7 @@ export const knownTokens: Record<string, Record<ChainId, string>> = {
   BKN: {
     8453: '0xFc209EeBA3D744aA741cc5C2A73Ebf9C977B5F82', // Base Mainnet
     1: '0xFc209EeBA3D744aA741cc5C2A73Ebf9C977B5F82', // Ethereum Mainnet
-    11151111: '0x2458fB1620ff84019d73216fF20aA1F82Bc8E4CC' // Sepolia
+    11155111: '0x2458fB1620ff84019d73216fF20aA1F82Bc8E4CC' // Sepolia
   },
   // WETH addresses (EVM only)
   WETH: {
@@ -45,6 +45,35 @@ export const knownTokens: Record<string, Record<ChainId, string>> = {
     'stacks-testnet': 'ST2Y455NJPETB2SRSD0VDZP3KJE50WNHY0BN3TWY5.usdcx',
   },
 };
+
+export type TokenCapability = 'erc3009' | 'permit';
+
+/**
+ * Token capabilities by address (lowercase) and chain
+ */
+export const tokenCapabilities: Record<string, Record<ChainId, TokenCapability>> = {
+  // USDC uses ERC-3009 (transferWithAuthorization)
+  USDC: {
+    8453: 'erc3009',
+    84532: 'erc3009',
+    1: 'erc3009',
+    11155111: 'erc3009',
+  },
+  // BKN uses EIP-2612 Permit
+  BKN: {
+    8453: 'permit',
+    1: 'permit',
+    11155111: 'permit',
+  },
+  // WETH uses Permit
+  WETH: {
+    8453: 'erc3009',
+    84532: 'erc3009',
+    1: 'erc3009',
+    11155111: 'erc3009',
+  },
+};
+
 
 /**
  * Default token configurations for facilitators (production)
@@ -154,6 +183,23 @@ export function getTokenConfig(chainId: ChainId, address: string): TokenConfig |
   return allTokens.find(
     (t) => t.chainId === chainId && t.address.toLowerCase() === address.toLowerCase()
   );
+}
+
+/**
+ * Get the capability for a token on a chain
+ */
+export function getTokenCapability(
+  chainId: ChainId,
+  address: string
+): TokenCapability | undefined {
+  // Find the token symbol by address
+  for (const [symbol, addresses] of Object.entries(knownTokens)) {
+    const tokenAddr = addresses[chainId];
+    if (tokenAddr && tokenAddr.toLowerCase() === address.toLowerCase()) {
+      return tokenCapabilities[symbol]?.[chainId];
+    }
+  }
+  return undefined;
 }
 
 /**

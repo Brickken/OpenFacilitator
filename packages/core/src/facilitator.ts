@@ -24,6 +24,8 @@ import { getChainIdFromNetwork, getNetworkFromChainId, getCaip2FromNetwork, defa
 import { executeERC3009Settlement } from './erc3009.js';
 import { executeSolanaSettlement } from './solana.js';
 import { executeStacksSettlement } from './stacks.js';
+import { getTokenCapability } from './tokens.js';
+import { executePermitSettlement } from './permit.js';
 
 /**
  * Custom chain definitions for chains not in viem
@@ -484,41 +486,64 @@ export class Facilitator {
 
         const payerAddress = authorization.from as string;
 
+        const capability = getTokenCapability(chainId, requirements.asset);
+        console.log(`[Facilitator] Token capability for ${requirements.asset}: ${capability}`);
+
         // Debug logging for EVM authorization
         console.log('[Facilitator] EVM authorization received:', JSON.stringify(authorization, null, 2));
         console.log('[Facilitator] EVM signature received:', signature);
 
-        const result = await executeERC3009Settlement({
-          chainId,
-          tokenAddress: requirements.asset as Address,
-          authorization: {
-            from: authorization.from as Address,
-            to: authorization.to as Address,
-            value: authorization.value,
-            validAfter: authorization.validAfter,
-            validBefore: authorization.validBefore,
-            nonce: authorization.nonce as Hex,
-          },
-          signature: signature as Hex,
-          facilitatorPrivateKey: privateKey as Hex,
-        });
+        if (capability === 'permit') {
+          // Use EIP-2612 Permit flow
+          console.log('[Facilitator] Using Permit settlement');
+          const result = await executePermitSettlement({
+            chainId,
+            tokenAddress: requirements.asset as Address,
+            authorization: {
+              owner: authorization.from as Address,
+              spender: authorization.to as Address, // Should be facilitator
+              value: authorization.value,
+              deadline: authorization.validBefore, // Permit uses deadline, not validBefore/validAfter
+            },
+            signature: signature as Hex,
+            facilitatorPrivateKey: privateKey as Hex,
+            recipient: requirements.payTo as Address,
+          });
 
-        if (result.success) {
           return {
-            success: true,
+            success: result.success,
             transaction: result.transactionHash || '',
             payer: payerAddress,
             network: requirements.network,
+            errorReason: result.errorMessage,
           };
         } else {
+          // Use ERC-3009 flow (default for USDC)
+          console.log('[Facilitator] Using ERC-3009 settlement');
+          const result = await executeERC3009Settlement({
+            chainId,
+            tokenAddress: requirements.asset as Address,
+            authorization: {
+              from: authorization.from as Address,
+              to: authorization.to as Address,
+              value: authorization.value,
+              validAfter: authorization.validAfter,
+              validBefore: authorization.validBefore,
+              nonce: authorization.nonce as Hex,
+            },
+            signature: signature as Hex,
+            facilitatorPrivateKey: privateKey as Hex,
+          });
+
           return {
-            success: false,
-            transaction: '',
+            success: result.success,
+            transaction: result.transactionHash || '',
             payer: payerAddress,
             network: requirements.network,
             errorReason: result.errorMessage,
           };
         }
+        
       }
 
       return {
